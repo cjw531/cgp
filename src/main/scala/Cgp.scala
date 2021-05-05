@@ -89,36 +89,45 @@ class Cgp (input: Int, output: Int, ar: Int, level: Int, row: Int, col: Int) {
     x.apply(Random.nextInt(x.size))
   }
 
-  def determine_nodes_to_process(): Unit = {
+  def determine_nodes_to_process() = {
     // Initialize Boolean list with all falses
     var NU = ListBuffer[Boolean]()
-    for (i <- 0 to this.num_input + (this.num_row*this.num_col)-1) {
+    for (i <- 0 to this.num_input + (this.num_row * this.num_col) - 1) {
       NU += false
     }
 
     // Set output nodes to be true
-    for (i <- (this.input + (this.num_row*this.num_col)) to (this.num_input + (this.num_row*this.num_col) + this.num_output)-1) {
+    for (i <- (this.input + (this.num_row * this.num_col)) to (this.num_input + (this.num_row * this.num_col) + this.num_output) - 1) {
       NU += true
     }
 
-    // Find active nodes
-    for (i <- (this.input + (this.num_row*this.num_col)) to (this.num_input + (this.num_row*this.num_col) + this.num_output)-1) {
+    // Find active nodes (go from output node and track the path to input)
+    for (i <- (this.input + (this.num_row * this.num_col)) to (this.num_input + (this.num_row * this.num_col) + this.num_output) - 1) {
       var output_node = node_list(i)
-      NU = find_path(output_node, NU)
+      var path = ListBuffer[Node]()
+      path += output_node
+      path = find_path(output_node, path) // recursion call
+      
     }
   }
 
-  def find_path(cgp_node: Node, NU: ListBuffer[Boolean]): ListBuffer[Boolean] = {
-    // base case
-    /// if at input node then stop
-    if (cgp_node.incoming.size == 0) {
-      return NU
+  def find_path(cgp_node: Node, path: ListBuffer[Node]): ListBuffer[Node] = {
+    // base cases
+    if (cgp_node.col_where == 0) { // currently reached the input node
+      return path
+    } else if (cgp_node.incoming.isEmpty) { // no incoming edges (the start point of traversal)
+      return path
+    } else {
+      for (incoming_node <- cgp_node.incoming) {
+        path += incoming_node
+        return find_path(incoming_node, path)
+      }
     }
-    // Mark each node in path as true and then recurse on that node
-    for (incoming_node <- cgp_node.incoming) {
-      NU(incoming_node.number) = true
-      return find_path(incoming_node, NU)
-    }
+    throw new IllegalStateException  // unreachable
+    /*
+    Exception done to resolve the return error (it becomes void/Unit type)
+    Reference: https://stackoverflow.com/questions/28884227/infinite-loop-seems-to-confuse-scalas-type-system
+     */
   }
 
   def decode_cgp(): Unit = {
