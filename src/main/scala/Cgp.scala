@@ -11,6 +11,11 @@ class Cgp (input: Int, output: Int, ar: Int, level: Int, row: Int, col: Int) {
   def num_row = row
   def num_col = col
   var node_list = ListBuffer[Node]()
+  var evaluation_score = 0
+
+  def set_evaluation_score(scoreToSet: Int): Unit = {
+    this.evaluation_score = scoreToSet
+  }
 
   def create_cgp(): Unit = {
     // add input nodes to the node list
@@ -41,6 +46,24 @@ class Cgp (input: Int, output: Int, ar: Int, level: Int, row: Int, col: Int) {
         this.node_list(n.number).add_out(node)
       }
     }
+
+    // connect edge to outputs
+    for (i <- this.num_input + (this.num_row*this.num_col) to this.num_input + (this.num_row*this.num_col) + this.num_output) {
+      var output_node = new Node("", i, num_col+1)
+      this.node_list += output_node
+      var col_from = this.num_col - this.lv_back
+      if (col_from < 0) col_from = 0
+      var col_to = this.num_col
+      var subset = ListBuffer[Node]()
+      for (node <- this.node_list) {
+        if (node.col_where >= col_from && node.col_where <= col_to) {
+          subset += node
+        }
+      }
+      var connection = subset.apply(Random.nextInt(subset.size))
+      output_node.add_in(connection)
+      this.node_list(connection.number).add_out(output_node)
+    }
   }
 
   def get_node_subset(from: Int, to: Int): ListBuffer[Node] = {
@@ -65,4 +88,42 @@ class Cgp (input: Int, output: Int, ar: Int, level: Int, row: Int, col: Int) {
     val x = List("+", "-", "*", "/")
     x.apply(Random.nextInt(x.size))
   }
+
+  def determine_nodes_to_process(): Unit = {
+    // Initialize Boolean list with all falses
+    var NU = ListBuffer[Boolean]()
+    for (i <- 0 to this.num_input + (this.num_row*this.num_col)-1) {
+      NU += false
+    }
+
+    // Set output nodes to be true
+    for (i <- (this.input + (this.num_row*this.num_col)) to (this.num_input + (this.num_row*this.num_col) + this.num_output)-1) {
+      NU += true
+    }
+
+    // Find active nodes
+    for (i <- (this.input + (this.num_row*this.num_col)) to (this.num_input + (this.num_row*this.num_col) + this.num_output)-1) {
+      var output_node = node_list(i)
+      NU = find_path(output_node, NU)
+    }
+  }
+
+  def find_path(cgp_node: Node, NU: ListBuffer[Boolean]): ListBuffer[Boolean] = {
+    // base case
+    /// if at input node then stop
+    if (cgp_node.incoming.size == 0) {
+      return NU
+    }
+    // Mark each node in path as true and then recurse on that node
+    for (incoming_node <- cgp_node.incoming) {
+      NU(incoming_node.number) = true
+      return find_path(incoming_node, NU)
+    }
+  }
+
+  def decode_cgp(): Unit = {
+    // Create boolean list of path from output to input
+    determine_nodes_to_process()
+  }
+
 }
