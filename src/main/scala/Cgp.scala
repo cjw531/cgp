@@ -1,3 +1,5 @@
+package main.scala
+
 import scala.collection.mutable.ListBuffer
 import scala.util.Random
 
@@ -34,7 +36,10 @@ class Cgp (input: Int, output: Int, ar: Int, level: Int, row: Int, col: Int) {
       if (col_from < 0) col_from = 0
       var col_to = node.col_where - 1
       var subset = get_node_subset(col_from, col_to)
-      for (n <- subset) println(i + " Node:" + n.number + " Col#:" + n.col_where)
+      for (n <- subset) {
+        node.add_in(n)
+        this.node_list(n.number).add_out(node)
+      }
     }
   }
 
