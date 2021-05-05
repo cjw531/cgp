@@ -3,8 +3,9 @@ package test.scala
 import main.scala.Cgp
 
 object CgpTest extends App {
+  /* TEST SUITE */
   //  test_create_cgp()
-  test_determine_nodes_to_process()
+  test_decode_cgp()
 
   /* TEST 1: create random cgp graph */
   def test_create_cgp(): Unit = {
@@ -18,9 +19,10 @@ object CgpTest extends App {
   }
 
   /* TEST 2: Decode cgp */
-  def test_determine_nodes_to_process(): Unit = {
+  def test_decode_cgp(): Unit = {
     var cgp = new Cgp(2, 1, 2, 2, 3, 3)
     cgp.create_cgp()
-    cgp.determine_nodes_to_process()
+    cgp.decode_cgp()
+    println(cgp.active_node)
   }
 }

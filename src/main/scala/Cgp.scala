@@ -11,6 +11,7 @@ class Cgp (input: Int, output: Int, ar: Int, level: Int, row: Int, col: Int) {
   def num_row = row
   def num_col = col
   var node_list = ListBuffer[Node]()
+  var active_node = ListBuffer[Boolean]()
   var evaluation_score = 0
 
   def set_evaluation_score(scoreToSet: Int): Unit = {
@@ -89,7 +90,7 @@ class Cgp (input: Int, output: Int, ar: Int, level: Int, row: Int, col: Int) {
     x.apply(Random.nextInt(x.size))
   }
 
-  def determine_nodes_to_process() = {
+  def decode_cgp() = {
     // Initialize Boolean list with all falses
     var NU = ListBuffer[Boolean]()
     for (i <- 0 to this.num_input + (this.num_row * this.num_col) - 1) {
@@ -107,15 +108,14 @@ class Cgp (input: Int, output: Int, ar: Int, level: Int, row: Int, col: Int) {
       var path = ListBuffer[Node]()
       path += output_node
       path = find_path(output_node, path) // recursion call
-      
+      this.active_node = boolean_nodes(path, NU)
     }
   }
 
+  /* Find node path from the input to the output node */
   def find_path(cgp_node: Node, path: ListBuffer[Node]): ListBuffer[Node] = {
     // base cases
-    if (cgp_node.col_where == 0) { // currently reached the input node
-      return path
-    } else if (cgp_node.incoming.isEmpty) { // no incoming edges (the start point of traversal)
+    if (cgp_node.incoming.isEmpty) { // no incoming edges anymore
       return path
     } else {
       for (incoming_node <- cgp_node.incoming) {
@@ -130,9 +130,12 @@ class Cgp (input: Int, output: Int, ar: Int, level: Int, row: Int, col: Int) {
      */
   }
 
-  def decode_cgp(): Unit = {
-    // Create boolean list of path from output to input
-    determine_nodes_to_process()
+  /* Based on path, mark nodes into boolean values, resulted in their activate status */
+  def boolean_nodes(path: ListBuffer[Node], NU: ListBuffer[Boolean]): ListBuffer[Boolean] = {
+    for (p <- path) {
+      NU(p.number) = true
+    }
+    return NU
   }
 
 }
