@@ -1,3 +1,5 @@
+package main.scala
+
 import scala.collection.mutable.ListBuffer
 
 class Node (op: String, num: Int, col_index: Int) {
@@ -13,6 +15,10 @@ class Node (op: String, num: Int, col_index: Int) {
 
   def remove_in (removal: Node): Unit = {
     this.incoming -= removal
+  }
+
+  def add_out (new_node: Node): Unit = {
+    this.outgoing += new_node
   }
 
 }

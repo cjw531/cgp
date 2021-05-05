@@ -1,3 +1,5 @@
+package main.scala
+
 object Runner extends App {
   var num_input = 1
   var num_output = 1
