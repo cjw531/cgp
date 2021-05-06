@@ -61,6 +61,7 @@ class Cgp (input: Int, output: Int, ar: Int, level: Int, row: Int, col: Int) {
     }
   }
 
+  /* based on levels_back and arity, get the adjacent nodes */
   def get_node_subset(from: Int, to: Int, arity: Int): ListBuffer[Node] = {
     var subset = ListBuffer[Node]()
     for (node <- this.node_list) {
@@ -130,6 +131,29 @@ class Cgp (input: Int, output: Int, ar: Int, level: Int, row: Int, col: Int) {
       NU(p.number) = true
     }
     return NU
+  }
+
+  def mutate_incoming_edges(node: Node): Unit = {
+    node.incoming.clear()
+    var col_from = node.col_where - this.arity
+    if (col_from < 0) col_from = 0
+    var col_to = node.col_where - 1
+    var subset = get_node_subset(col_from, col_to, this.arity)
+    for (n <- subset) {
+      node.add_in(n)
+    }
+  }
+
+  def mutate_operator(node: Node): Unit = {
+    var prev_op = node.operator
+    var new_op = random_function()
+    while (prev_op == new_op) new_op = random_function()
+    node.operator = new_op
+  }
+
+  def mutate_node(node: Node): Unit = {
+    mutate_operator(node)
+    mutate_incoming_edges(node)
   }
 
 }

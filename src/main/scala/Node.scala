@@ -3,7 +3,7 @@ package main.scala
 import scala.collection.mutable.ListBuffer
 
 class Node (op: String, num: Int, col_index: Int) {
-  def operator = op
+  var operator = op
   def number = num
   var incoming = ListBuffer[Node]()
   var outgoing = ListBuffer[Node]()
