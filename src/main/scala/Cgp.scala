@@ -2,8 +2,8 @@ package main.scala
 
 import scala.collection.mutable.ListBuffer
 import scala.util.Random
-
-class Cgp (input: Int, output: Int, ar: Int, level: Int, row: Int, col: Int) {
+// Any type? or generic
+class Cgp (input: Int, output: Int, ar: Int, level: Int, row: Int, col: Int, functions: List[Type]) {
   def num_input = input
   def num_output = output
   def arity = ar
@@ -13,6 +13,8 @@ class Cgp (input: Int, output: Int, ar: Int, level: Int, row: Int, col: Int) {
   var node_list = ListBuffer[Node]()
   var active_node = ListBuffer[Boolean]()
   var evaluation_score = 0
+  var sample_points = ListBuffer[Int]()
+  var true_values = ListBuffer[Int]()
 
   def set_evaluation_score(scoreToSet: Int): Unit = {
     this.evaluation_score = scoreToSet
@@ -85,12 +87,79 @@ class Cgp (input: Int, output: Int, ar: Int, level: Int, row: Int, col: Int) {
     x.apply(Random.nextInt(x.size))
   }
 
-  def decode_cgp() = {
+  def generate_sample_of_points(): Unit ={
+    var number_of_points = 100
+    val r = scala.util.Random
+    for (i <- 0 to number_of_points) {
+      this.sample_points += r.nextInt(100)
+    }
+  }
+
+  def func(x: Int): Int = {
+    return x^2 + 2*x + 1
+  }
+
+  def evaluate_true_values(): Unit = {
+    for (point <- this.sample_points) {
+      this.true_values += func(point)
+    }
+  }
+
+  // squared difference
+  def compute_fitness(computed_values: ListBuffer[Int]): Unit = {
+    var diff = ListBuffer[Int]()
+    for (i <- 0 to computed_values.length) {
+     diff += (computed_values(i) - this.true_values(i))
+    }
+    diff.map(x => x*x)
+    this.evaluation_score = diff.sum
+  }
+
+  def evaluate_cgp(NU: ListBuffer[Boolean]): Unit = {
+    // Find true values to compare
+    generate_sample_of_points()
+    evaluate_true_values()
+
+    // compute values for active nodes
+    var NP = ListBuffer[Int]()
+
+    for (i <- 0 to NU.length) {
+      NP += 0
+    }
+
+    var predictions = ListBuffer[Int]()
+
+    for (point <- sample_points) {
+      for (cgp_node_idx <- 0 to NU.length) {
+        if (NU(cgp_node_idx) == true) { // if it's active
+          var node = this.node_list(cgp_node_idx + num_input)
+          // apply function to all incoming
+          for (incoming_node <- node.incoming) {
+            // node.operator
+          }
+          // NP(cgp_node_idx) +=
+        }
+      }
+    }
+
+    // compare to true values to get a fitness metric
+    compute_fitness(predictions)
+  }
+
+  def decode_cgp(): Unit = {
+    var NU = find_active_nodes()
+    evaluate_cgp(NU)
+  }
+
+  def find_active_nodes(): ListBuffer[Boolean] = {
     // Initialize Boolean list with all falses
     var NU = ListBuffer[Boolean]()
     for (i <- 0 to this.num_input + (this.num_row * this.num_col) - 1) {
       NU += false
     }
+
+    // commenting out because we really only need the true false values for the middle nodes
+    // since those are the nodes which evaluate the functions
 
     // Set output nodes to be true
     for (i <- (this.input + (this.num_row * this.num_col)) to (this.num_input + (this.num_row * this.num_col) + this.num_output) - 1) {
@@ -105,6 +174,8 @@ class Cgp (input: Int, output: Int, ar: Int, level: Int, row: Int, col: Int) {
       path = find_path(output_node, path) // recursion call
       this.active_node = boolean_nodes(path, NU)
     }
+
+    return NU
   }
 
   /* Find node path from the input to the output node */

@@ -5,8 +5,10 @@ import main.scala.Cgp
 object CgpTest extends App {
   /* TEST SUITE */
 //  test_create_cgp()
+//  test_find_active_nodes()
 //  test_decode_cgp()
-  test_mutate_cgp()
+//  test_mutate_cgp()
+  test_generate_sample_of_points()
 
   /* TEST 1: create random cgp graph */
   def test_create_cgp(): Unit = {
@@ -20,10 +22,10 @@ object CgpTest extends App {
   }
 
   /* TEST 2: Decode cgp */
-  def test_decode_cgp(): Unit = {
+  def test_find_active_nodes(): Unit = {
     var cgp = new Cgp(2, 1, 2, 2, 3, 3)
     cgp.create_cgp()
-    cgp.decode_cgp()
+    cgp.find_active_nodes()
     println(cgp.active_node)
   }
 
@@ -52,5 +54,11 @@ object CgpTest extends App {
     println("After--Node Mutation:")
     println("Incoming Edges: " + test_node.incoming)
     println("Operator: " + test_node.operator)
+  }
+
+  def test_generate_sample_of_points(): Unit = {
+    var cgp = new Cgp(2, 1, 2, 2, 3, 3)
+    cgp.create_cgp()
+    cgp.generate_sample_of_points()
   }
 }
