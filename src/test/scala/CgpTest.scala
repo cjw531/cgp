@@ -4,8 +4,8 @@ import main.scala.Cgp
 
 object CgpTest extends App {
   /* TEST SUITE */
-  //  test_create_cgp()
-  test_decode_cgp()
+  test_create_cgp()
+//  test_decode_cgp()
 
   /* TEST 1: create random cgp graph */
   def test_create_cgp(): Unit = {

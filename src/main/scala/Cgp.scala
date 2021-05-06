@@ -41,7 +41,7 @@ class Cgp (input: Int, output: Int, ar: Int, level: Int, row: Int, col: Int) {
       var col_from = node.col_where - this.arity
       if (col_from < 0) col_from = 0
       var col_to = node.col_where - 1
-      var subset = get_node_subset(col_from, col_to)
+      var subset = get_node_subset(col_from, col_to, this.arity)
       for (n <- subset) {
         node.add_in(n)
         this.node_list(n.number).add_out(node)
@@ -55,19 +55,13 @@ class Cgp (input: Int, output: Int, ar: Int, level: Int, row: Int, col: Int) {
       var col_from = this.num_col - this.lv_back
       if (col_from < 0) col_from = 0
       var col_to = this.num_col
-      var subset = ListBuffer[Node]()
-      for (node <- this.node_list) {
-        if (node.col_where >= col_from && node.col_where <= col_to) {
-          subset += node
-        }
-      }
-      var connection = subset.apply(Random.nextInt(subset.size))
-      output_node.add_in(connection)
-      this.node_list(connection.number).add_out(output_node)
+      var subset = get_node_subset(col_from, col_to, 1) // output node has only 1 edge
+      output_node.add_in(subset(0)) // 0th element is the only element stored here
+      this.node_list(subset(0).number).add_out(output_node)
     }
   }
 
-  def get_node_subset(from: Int, to: Int): ListBuffer[Node] = {
+  def get_node_subset(from: Int, to: Int, arity: Int): ListBuffer[Node] = {
     var subset = ListBuffer[Node]()
     for (node <- this.node_list) {
       if (node.col_where >= from && node.col_where <= to) {
@@ -78,7 +72,7 @@ class Cgp (input: Int, output: Int, ar: Int, level: Int, row: Int, col: Int) {
     }
 
     var adjacent = ListBuffer[Node]()
-    for (i <- 1 to this.arity) { // pick arity # of random nodes
+    for (i <- 1 to arity) { // pick arity # of random nodes
       adjacent += subset.apply(Random.nextInt(subset.size))
     }
     return adjacent // return the node that has a connection
