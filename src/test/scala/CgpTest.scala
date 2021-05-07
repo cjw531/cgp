@@ -8,7 +8,8 @@ object CgpTest extends App {
 //  test_find_active_nodes()
 //  test_decode_cgp()
 //  test_mutate_cgp()
-  test_generate_sample_of_points()
+//  test_generate_sample_of_points()
+  test_mutate_wrapper()
 
   /* TEST 1: create random cgp graph */
   def test_create_cgp(): Unit = {
@@ -56,9 +57,21 @@ object CgpTest extends App {
     println("Operator: " + test_node.operator)
   }
 
+  /* TEST 4: */
   def test_generate_sample_of_points(): Unit = {
     var cgp = new Cgp(2, 1, 2, 2, 3, 3)
     cgp.create_cgp()
     cgp.generate_sample_of_points()
+  }
+
+  /* TEST 5: test mutation wrapper method */
+  def test_mutate_wrapper(): Unit = {
+    var cgp = new Cgp(2, 1, 2, 2, 3, 3)
+    cgp.create_cgp()
+    println("BEFORE--")
+    for (n <- cgp.node_list) println(n.number + "'s edges: " + n.incoming)
+    cgp.mutate_cgp(0.7, true, false)
+    println("AFTER--")
+    for (n <- cgp.node_list) println(n.number + "'s edges: " + n.incoming)
   }
 }

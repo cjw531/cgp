@@ -3,7 +3,7 @@ package main.scala
 import scala.collection.mutable.ListBuffer
 import scala.util.Random
 // Any type? or generic
-class Cgp (input: Int, output: Int, ar: Int, level: Int, row: Int, col: Int, functions: List[Type]) {
+class Cgp (input: Int, output: Int, ar: Int, level: Int, row: Int, col: Int) {
   def num_input = input
   def num_output = output
   def arity = ar
@@ -202,6 +202,19 @@ class Cgp (input: Int, output: Int, ar: Int, level: Int, row: Int, col: Int, fun
       NU(p.number) = true
     }
     return NU
+  }
+
+  def mutate_cgp(probability: Double, is_node: Boolean, is_edge: Boolean): Unit = {
+    val r = new scala.util.Random
+    for (n <- node_list) {
+//      var rand = scala.util.Random.nextDouble
+      var rand_prob = r.nextDouble
+      if (rand_prob <= probability) {
+        if (is_node && is_edge) mutate_node(n)
+        else if (is_node) mutate_node(n)
+        else if (is_edge) mutate_incoming_edges(n)
+      }
+    }
   }
 
   def mutate_incoming_edges(node: Node): Unit = {
