@@ -34,7 +34,7 @@ class Cgp (input: Int, output: Int, level: Int, row: Int, col: Int, funcs: List[
       this.node_list += input_node
     }
 
-    // for node grid (inner nodes, without input nodes)
+    // for node grid (inner nodes, without input nodes, row by col)
     var col_start = 0 // n-th col #
     for (i <- this.num_input to (this.num_input - 1) + (this.num_row * this.num_col)) {
       if ((i - this.num_input) % num_col == 0) {
@@ -171,26 +171,22 @@ class Cgp (input: Int, output: Int, level: Int, row: Int, col: Int, funcs: List[
   }
 
   def mutate_incoming_edges(node: Node): Unit = {
-    if (node.incoming.size == 1) {
-      // Output node
+    if (node.incoming.size == 1) { // Output node
       node.incoming.clear()
       var col_from = this.num_col - this.lv_back + 1
       if (col_from < 0) col_from = 0
-      var col_to = this.num_col
       var subset = get_node_subset(0, this.num_col, 1)
       for (subst_node <- subset) {
-        node.add_in(subst_node)
+        node.add_in(subst_node.deep_copy())
       }
-    }
-    else {
-      // Inner node
+    } else { // Inner node
       node.incoming.clear()
       var col_from = node.col_where - this.lv_back
       if (col_from < 0) col_from = 0
       var col_to = node.col_where - 1
       var subset = get_node_subset(col_from, col_to, this.arity)
       for (subst_node <- subset) {
-        node.add_in(subst_node)
+        node.add_in(subst_node.deep_copy())
       }
     }
   }

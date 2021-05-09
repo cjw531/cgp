@@ -99,32 +99,13 @@ object Runner extends App {
 
   }
 
-
-//
-//  var threshold = 10
-//
-////  while (lowest_cgp_metric_val > threshold) {
-////    // Mutate to create offspring based on the best cgp
-////    var CGP_to_mutate = cgps(best_cgp_idx)
-////    cgps.clear()
-////    for (i <- 0 to num_cgps_to_evaluate - 1) {
-////      // Mutate
-//////      var mutated_CGP = None
-//////      cgps += mutated_CGP
-////    }
-////
-////    // Evaluate mutated cgps
-////      //// should be threaded
-////    for (cgp <- cgps) {
-////
-////    }
-////  }
-//
-//  //  var n = new Node("+", 0)
-//  //  println(n.incoming)
-//  //  var nn = new Node("-", 1)
-//  //  n.add_in(nn)
-//  //  println(n.incoming)
-//  //  n.remove_in(nn)
-//  //  println(n.incoming)
+  /* Testing deepcopy of the node */
+  var node_1 =  new Node(1, 1, 1)
+  var node_2 = node_1.deep_copy()
+  node_2.func_idx = 2
+  println("Node 1's Num: " + node_1.func_idx)
+  println("Node 2's Num: " + node_2.func_idx)
+  node_2.incoming += node_1
+  println("Node 1's incoming: " + node_1.incoming)
+  println("Node 2's incoming: " + node_2.incoming)
 }
