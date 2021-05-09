@@ -2,8 +2,8 @@ package main.scala
 
 import scala.collection.mutable.ListBuffer
 
-class Node (op: String, num: Int, col_index: Int) {
-  var operator = op
+class Node (idx: Int, num: Int, col_index: Int) {
+  var func_idx = idx
   def number = num
   var incoming = ListBuffer[Node]()
   var outgoing = ListBuffer[Node]()

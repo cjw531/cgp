@@ -1,5 +1,7 @@
 package main.scala
 
+import scala.collection.mutable.ListBuffer
+
 class Functions {
   def or(x:Int, y:Int): Unit = {
     return x | y
@@ -13,27 +15,34 @@ class Functions {
     return x ^ y
   }
 
-  def divide(x:Int, y:Int): Unit = {
-    if (y == 0) {
-      return 0
+  def add = (vals: List[Int]) => {vals.sum}
+
+  val divide: List[Int] => Int = vals => {
+    var result = vals(0)
+    for (i <- 1 to vals.size-1) {
+      if (vals(i) == 0) {
+        result = 0
+      }
+      else {
+        result = result / vals(i)
+      }
     }
-    return x / y
+    result.toInt
   }
 
-  def add(x:Int, y:Int): Unit = {
-    return x-y
+  val subtract: List[Int] => Int = vals => {
+    var result = vals(0)
+    for (i <- 1 to vals.size-1) {
+      result = result - vals(i)
+    }
+    result
   }
 
-  def subtract (x:Int, y:Int): Unit = {
-    return x -y
-  }
+  def multiply = (vals: List[Int]) => {vals.product}
 
-  def multiply(x: Int, y: Int): Unit = {
-    return x * y
-  }
 
-  def square(x: Int): Unit = {
-    return x^2
+  def square(vals: List[Int]): Unit = {
+    return vals.map(x => x*x)
   }
 
 }

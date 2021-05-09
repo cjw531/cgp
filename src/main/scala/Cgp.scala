@@ -3,34 +3,41 @@ package main.scala
 import scala.collection.mutable.ListBuffer
 import scala.util.Random
 // Any type? or generic
-class Cgp (input: Int, output: Int, ar: Int, level: Int, row: Int, col: Int) {
+class Cgp (input: Int, output: Int, level: Int, row: Int, col: Int, funcs: List[List[Int] => Int]) {
   def num_input = input
   def num_output = output
-  def arity = ar
+  def arity = funcs.size
   def lv_back = level
   def num_row = row
   def num_col = col
+  val functions_options = funcs
   var node_list = ListBuffer[Node]()
-  var active_node = ListBuffer[Boolean]()
-  var evaluation_score = 0
-  var sample_points = ListBuffer[Int]()
-  var true_values = ListBuffer[Int]()
+  var NU = ListBuffer[Boolean]()
+  var evaluation_score: BigInt = 0
 
-  def set_evaluation_score(scoreToSet: Int): Unit = {
+  def set_evaluation_score(scoreToSet: BigInt): Unit = {
     this.evaluation_score = scoreToSet
+  }
+
+  def set_node_list(node_list: ListBuffer[Node]): Unit = {
+    this.node_list = node_list
+  }
+
+  def set_NU(nu_arr: ListBuffer[Boolean]): Unit = {
+    this.NU = nu_arr
   }
 
   def create_cgp(): Unit = {
     // add input nodes to the node list
-    for (i <- 0 to (input - 1)) {
-      var input_node = new Node("", i, 0)
+    for (i <- 0 to (this.num_input - 1)) {
+      var input_node = new Node(-1, i, 0)
       this.node_list += input_node
     }
 
     // for node grid (inner nodes, without input nodes)
     var col_start = 0 // n-th col #
-    for (i <- num_input to (num_input - 1) + (this.num_row * this.num_col)) {
-      if ((i - input) % num_col == 0) {
+    for (i <- this.num_input to (this.num_input - 1) + (this.num_row * this.num_col)) {
+      if ((i - this.num_input) % num_col == 0) {
         col_start += 1
       }
       var inner_node = new Node(random_function(), i, col_start)
@@ -38,9 +45,9 @@ class Cgp (input: Int, output: Int, ar: Int, level: Int, row: Int, col: Int) {
     }
 
     // randomly connect nodes
-    for (i <- num_input to (num_input - 1) + (this.num_row * this.num_col)) {
+    for (i <- this.num_input to (this.num_input - 1) + (this.num_row * this.num_col)) {
       var node = this.node_list(i)
-      var col_from = node.col_where - this.arity
+      var col_from = node.col_where - this.lv_back
       if (col_from < 0) col_from = 0
       var col_to = node.col_where - 1
       var subset = get_node_subset(col_from, col_to, this.arity)
@@ -51,13 +58,12 @@ class Cgp (input: Int, output: Int, ar: Int, level: Int, row: Int, col: Int) {
     }
 
     // connect edge to outputs
-    for (i <- this.num_input + (this.num_row*this.num_col) to this.num_input + (this.num_row*this.num_col) + this.num_output) {
-      var output_node = new Node("", i, num_col+1)
+    for (i <- this.num_input + (this.num_row*this.num_col) to this.num_input + (this.num_row*this.num_col) + this.num_output - 1) {
+      var output_node = new Node(-1, i, this.num_col+1)
       this.node_list += output_node
-      var col_from = this.num_col - this.lv_back
+      var col_from = this.num_col - this.lv_back + 1
       if (col_from < 0) col_from = 0
-      var col_to = this.num_col
-      var subset = get_node_subset(col_from, col_to, 1) // output node has only 1 edge
+      var subset = get_node_subset(col_from, this.num_col, 1) // output node has only 1 edge
       output_node.add_in(subset(0)) // 0th element is the only element stored here
       this.node_list(subset(0).number).add_out(output_node)
     }
@@ -73,7 +79,6 @@ class Cgp (input: Int, output: Int, ar: Int, level: Int, row: Int, col: Int) {
       // TODO: think of an optimization here
       // TODO: e.g. early exit from the loop?
     }
-
     var adjacent = ListBuffer[Node]()
     for (i <- 1 to arity) { // pick arity # of random nodes
       adjacent += subset.apply(Random.nextInt(subset.size))
@@ -82,157 +87,119 @@ class Cgp (input: Int, output: Int, ar: Int, level: Int, row: Int, col: Int) {
   }
 
   /* returns random operations for each node */
-  def random_function(): String = {
-    val x = List("+", "-", "*", "/")
-    x.apply(Random.nextInt(x.size))
-  }
-
-  def generate_sample_of_points(): Unit ={
-    var number_of_points = 100
+  def random_function(): Int = {
     val r = scala.util.Random
-    for (i <- 0 to number_of_points) {
-      this.sample_points += r.nextInt(100)
-    }
+    r.nextInt(this.functions_options.size)
   }
 
-  def func(x: Int): Int = {
-    return x^2 + 2*x + 1
-  }
-
-  def evaluate_true_values(): Unit = {
-    for (point <- this.sample_points) {
-      this.true_values += func(point)
-    }
-  }
-
-  // squared difference
-  def compute_fitness(computed_values: ListBuffer[Int]): Unit = {
-    var diff = ListBuffer[Int]()
-    for (i <- 0 to computed_values.length) {
-     diff += (computed_values(i) - this.true_values(i))
-    }
-    diff.map(x => x*x)
-    this.evaluation_score = diff.sum
-  }
-
-  def evaluate_cgp(NU: ListBuffer[Boolean]): Unit = {
-    // Find true values to compare
-    generate_sample_of_points()
-    evaluate_true_values()
-
+  def evaluate_cgp(points: ListBuffer[Int]): ListBuffer[Int] = {
     // compute values for active nodes
     var NP = ListBuffer[Int]()
 
-    for (i <- 0 to NU.length) {
+    // Set all to 0 to begin with
+    for (i <- 0 to this.NU.length-1) {
       NP += 0
     }
 
     var predictions = ListBuffer[Int]()
 
-    for (point <- sample_points) {
-      for (cgp_node_idx <- 0 to NU.length) {
+    for (point <- points) {
+      for (cgp_node_idx <- 0 to this.NU.length-1) {
         if (NU(cgp_node_idx) == true) { // if it's active
-          var node = this.node_list(cgp_node_idx + num_input)
+          var node = this.node_list(cgp_node_idx + this.num_input) // offset so we can idx node in node_list
           // apply function to all incoming
+          var temp_vals = ListBuffer[Int]()
           for (incoming_node <- node.incoming) {
-            // node.operator
+            if (incoming_node.incoming.isEmpty) {
+              temp_vals += point
+            }
+            else {
+              temp_vals += NP(incoming_node.number - num_input)
+            }
           }
-          // NP(cgp_node_idx) +=
+          NP(cgp_node_idx) = this.functions_options(node.func_idx)(temp_vals.toList)
         }
       }
+      // hard-coded to one output rn
+      var cgp_eval_val = NP(node_list(this.num_input + (this.num_row*this.num_col)).incoming(0).number - num_input)// output_node
+      predictions += cgp_eval_val
     }
-
-    // compare to true values to get a fitness metric
-    compute_fitness(predictions)
+    return predictions
   }
 
-  def decode_cgp(): Unit = {
-    var NU = find_active_nodes()
-    evaluate_cgp(NU)
+  def decode_cgp(points: ListBuffer[Int]): ListBuffer[Int] = {
+    find_active_nodes()
+    return evaluate_cgp(points)
   }
 
-  def find_active_nodes(): ListBuffer[Boolean] = {
+  def find_active_nodes(): Unit = {
     // Initialize Boolean list with all falses
-    var NU = ListBuffer[Boolean]()
-    for (i <- 0 to this.num_input + (this.num_row * this.num_col) - 1) {
-      NU += false
-    }
-
-    // commenting out because we really only need the true false values for the middle nodes
-    // since those are the nodes which evaluate the functions
-
-    // Set output nodes to be true
-    for (i <- (this.input + (this.num_row * this.num_col)) to (this.num_input + (this.num_row * this.num_col) + this.num_output) - 1) {
-      NU += true
+    this.NU.clear()
+    for (i <- this.num_input to this.num_input + (this.num_row * this.num_col) - 1) {
+      this.NU += false
     }
 
     // Find active nodes (go from output node and track the path to input)
-    for (i <- (this.input + (this.num_row * this.num_col)) to (this.num_input + (this.num_row * this.num_col) + this.num_output) - 1) {
-      var output_node = node_list(i)
-      var path = ListBuffer[Node]()
-      path += output_node
-      path = find_path(output_node, path) // recursion call
-      this.active_node = boolean_nodes(path, NU)
+    for (i <- (this.num_input + (this.num_row * this.num_col)) to (this.num_input + (this.num_row * this.num_col) + this.num_output) - 1) {
+      var output_node = this.node_list(i)
+      new_find_path(output_node)
     }
-
-    return NU
   }
 
-  /* Find node path from the input to the output node */
-  def find_path(cgp_node: Node, path: ListBuffer[Node]): ListBuffer[Node] = {
-    // base cases
-    if (cgp_node.incoming.isEmpty) { // no incoming edges anymore
-      return path
-    } else {
-      for (incoming_node <- cgp_node.incoming) {
-        path += incoming_node
-        return find_path(incoming_node, path)
+  def new_find_path(node: Node): Unit = {
+    if (node.incoming.isEmpty) {
+      return
+    }
+    for (n <- node.incoming) {
+      if (n.incoming.isEmpty == false) {
+        NU(n.number - this.num_input) = true
+        new_find_path(n)
       }
     }
-    throw new IllegalStateException  // unreachable
-    /*
-    Exception done to resolve the return error (it becomes void/Unit type)
-    Reference: https://stackoverflow.com/questions/28884227/infinite-loop-seems-to-confuse-scalas-type-system
-     */
-  }
-
-  /* Based on path, mark nodes into boolean values, resulted in their activate status */
-  def boolean_nodes(path: ListBuffer[Node], NU: ListBuffer[Boolean]): ListBuffer[Boolean] = {
-    for (p <- path) {
-      NU(p.number) = true
-    }
-    return NU
   }
 
   def mutate_cgp(probability: Double, is_node: Boolean, is_edge: Boolean): Unit = {
     val r = new scala.util.Random
-    for (n <- node_list) {
-//      var rand = scala.util.Random.nextDouble
+    for (node_idx <- this.num_input to node_list.size-1) {
       var rand_prob = r.nextDouble
       if (rand_prob <= probability) {
-        if (is_node && is_edge) mutate_node(n)
-        else if (is_node) mutate_node(n)
-        else if (is_edge) mutate_incoming_edges(n)
+        if (is_node && is_edge) mutate_node(this.node_list(node_idx))
+        else if (is_node) mutate_node(this.node_list(node_idx))
+        else if (is_edge) mutate_incoming_edges(this.node_list(node_idx))
       }
     }
   }
 
   def mutate_incoming_edges(node: Node): Unit = {
-    node.incoming.clear()
-    var col_from = node.col_where - this.arity
-    if (col_from < 0) col_from = 0
-    var col_to = node.col_where - 1
-    var subset = get_node_subset(col_from, col_to, this.arity)
-    for (n <- subset) {
-      node.add_in(n)
+    if (node.incoming.size == 1) {
+      // Output node
+      node.incoming.clear()
+      var col_from = this.num_col - this.lv_back + 1
+      if (col_from < 0) col_from = 0
+      var col_to = this.num_col
+      var subset = get_node_subset(0, this.num_col, 1)
+      for (subst_node <- subset) {
+        node.add_in(subst_node)
+      }
+    }
+    else {
+      // Inner node
+      node.incoming.clear()
+      var col_from = node.col_where - this.lv_back
+      if (col_from < 0) col_from = 0
+      var col_to = node.col_where - 1
+      var subset = get_node_subset(col_from, col_to, this.arity)
+      for (subst_node <- subset) {
+        node.add_in(subst_node)
+      }
     }
   }
 
   def mutate_operator(node: Node): Unit = {
-    var prev_op = node.operator
-    var new_op = random_function()
-    while (prev_op == new_op) new_op = random_function()
-    node.operator = new_op
+    var prev_func_idx = node.func_idx
+    var new_func_idx = random_function()
+    while (prev_func_idx == new_func_idx) new_func_idx = random_function()
+    node.func_idx = new_func_idx
   }
 
   def mutate_node(node: Node): Unit = {
