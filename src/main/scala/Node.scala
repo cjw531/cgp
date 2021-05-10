@@ -23,16 +23,18 @@ class Node (idx: Int, num: Int, col_index: Int) {
 
   def deep_copy (): Node = {
     val copied_idx = this.func_idx
-    val copied_num = this.num
+    val copied_num = this.number
     val copied_col_idx = this.col_where
     val copied_node = new Node(copied_idx, copied_num, copied_col_idx)
     var copied_incoming = ListBuffer[Node]()
     var copied_outgoing = ListBuffer[Node]()
     for (n <- this.incoming) {
-      copied_incoming += n.deep_copy()
+      val n_copied_node = new Node(n.func_idx, n.number, n.col_where)
+      copied_incoming += n_copied_node
     }
     for (n <- this.outgoing) {
-      copied_outgoing += n.deep_copy()
+      val n_copied_node = new Node(n.func_idx, n.number, n.col_where)
+      copied_outgoing += n_copied_node
     }
     copied_node.incoming = copied_incoming
     copied_node.outgoing = copied_outgoing

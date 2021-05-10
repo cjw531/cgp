@@ -1,8 +1,6 @@
 package main.scala
 
 import scala.collection.mutable.ListBuffer
-import scala.util.control.Breaks.break
-
 
 object Runner extends App {
   var num_input = 1
@@ -17,7 +15,6 @@ object Runner extends App {
   var best_cgp_idx = -1
   var lowest_cgp_metric_val: BigInt = 0
 
-
   var funcs = new Functions()
   var function_options = List(funcs.add, funcs.subtract, funcs.multiply, funcs.divide)
 
@@ -31,7 +28,7 @@ object Runner extends App {
   print("Points: ")
   println(sample_points)
 
-  // define true functin to evaluate
+  // define true function to evaluate
   def func(x: Int): Int = {
     return x^2 + 2*x + 1
   }
@@ -91,21 +88,18 @@ object Runner extends App {
   for (i <- 0 to num_cgps_to_evaluate - 1) {
     var mutated_cgp = new Cgp(1, num_output, lv_back, num_row, num_col, function_options)
     // copy node list from parent
+//    mutated_cgp.set_node_list(CGP_to_mutate.node_list.clone.map(_.clone))
+    for (n <- CGP_to_mutate.node_list) { // deep copy the node
+      mutated_cgp.node_list += n.deep_copy()
+    }
 
-    //    mutated_cgp.set_node_list(CGP_to_mutate.node_list.clone.map(_.clone))
-////    mutated_cgp.set_NU(CGP_to_mutate.NU.clone.map(_.clone))
-//    mutated_cgp.mutate_cgp(0.5, false, true)
-//    var preds = mutated_cgp.decode_cgp(sample_points)
+//    mutated_cgp.set_NU(CGP_to_mutate.NU.clone.map(_.clone))
+    for (active_node <- CGP_to_mutate.NU) { // copy the boolean array
+      mutated_cgp.NU += active_node
+    }
 
+    mutated_cgp.mutate_cgp(0.5, false, true) // call mutation function
+    var preds = mutated_cgp.decode_cgp(sample_points)
   }
 
-  /* Testing deepcopy of the node */
-  var node_1 =  new Node(1, 1, 1)
-  var node_2 = node_1.deep_copy()
-  node_2.func_idx = 2
-  println("Node 1's Num: " + node_1.func_idx)
-  println("Node 2's Num: " + node_2.func_idx)
-  node_2.incoming += node_1
-  println("Node 1's incoming: " + node_1.incoming)
-  println("Node 2's incoming: " + node_2.incoming)
 }
