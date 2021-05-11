@@ -88,21 +88,63 @@ object Runner extends App {
   val CGP_to_mutate = cgps(best_cgp_idx)
   println(CGP_to_mutate.evaluation_score)
 
-  for (i <- 0 to num_cgps_to_evaluate - 1) {
-    var mutated_cgp = new Cgp(1, num_output, lv_back, num_row, num_col, function_options)
-    // copy node list from parent
-//    mutated_cgp.set_node_list(CGP_to_mutate.node_list.clone.map(_.clone))
-    for (n <- CGP_to_mutate.node_list) { // deep copy the node
-      mutated_cgp.node_list += n.deep_copy()
+  var generation = 0
+  var threshold = 10
+  while (lowest_cgp_metric_val > threshold) {
+    generation += 1
+    println("Generation: " + generation)
+    // Mutate to create offspring based on the best cgp
+    var CGP_to_mutate = cgps(best_cgp_idx)
+    cgps.clear()
+    for (i <- 0 to num_cgps_to_evaluate - 1) {
+      // Mutate
+      var mutated_cgp = new Cgp(1, num_output, lv_back, num_row, num_col, function_options)
+      for (n <- CGP_to_mutate.node_list) { // deep copy the node
+        mutated_cgp.node_list += n.deep_copy()
+      }
+
+      for (n <- mutated_cgp.node_list) { // deep copy edge list again
+        for (i <- 0 to n.incoming.size - 1) {
+          n.incoming(i) = mutated_cgp.node_list(n.incoming(i).number)
+        }
+        for (i <- 0 to n.outgoing.size - 1) {
+          n.outgoing(i) = mutated_cgp.node_list(n.outgoing(i).number)
+        }
+      }
+
+      for (active_node <- CGP_to_mutate.NU) { // copy the boolean array
+        mutated_cgp.NU += active_node
+      }
+
+      mutated_cgp.mutate_cgp(0.5, false, true) // call mutation function
+      cgps += mutated_cgp
     }
 
-//    mutated_cgp.set_NU(CGP_to_mutate.NU.clone.map(_.clone))
-    for (active_node <- CGP_to_mutate.NU) { // copy the boolean array
-      mutated_cgp.NU += active_node
-    }
+    // Evaluate mutated cgps
+    // should be threaded
+    for (i <- 0 to num_cgps_to_evaluate) {
+      var cgp = cgps(i)
+      var preds = cgp.decode_cgp(sample_points)
+      var diff = ListBuffer[BigInt]()
+      for (i <- 0 to preds.length-1) {
+        diff += (true_values(i) - preds(i))
+      }
+      var diff_squared = ListBuffer[BigInt]()
+      for (i <- 0 to diff.length-1) {
+        diff_squared += diff(i).pow(2)
+      }
 
-    mutated_cgp.mutate_cgp(0.5, false, true) // call mutation function
-    var preds = mutated_cgp.decode_cgp(sample_points)
+      cgp.evaluation_score = diff_squared.sum
+      if (i == 0) {
+        best_cgp_idx = i
+        lowest_cgp_metric_val = cgp.evaluation_score
+      }
+      else if (cgp.evaluation_score < lowest_cgp_metric_val) {
+        best_cgp_idx = i
+        lowest_cgp_metric_val = cgp.evaluation_score
+      }
+      cgps += cgp
+    }
   }
 
 }
