@@ -19,6 +19,10 @@ class Cgp (input: Int, output: Int, level: Int, row: Int, col: Int, funcs: List[
     this.evaluation_score = scoreToSet
   }
 
+  def add_to_node_list(node: Node): Unit = {
+    this.node_list += node
+  }
+
   def set_node_list(node_list: ListBuffer[Node]): Unit = {
     this.node_list = node_list
   }
@@ -93,6 +97,15 @@ class Cgp (input: Int, output: Int, level: Int, row: Int, col: Int, funcs: List[
   }
 
   def evaluate_cgp(points: ListBuffer[Int]): ListBuffer[Int] = {
+    // if no active nodes, then output maps to input and just return the point then
+    if (!this.NU.contains(true)) {
+      var predictions = ListBuffer[Int]()
+      for (point <- points) {
+        predictions += point
+      }
+      return predictions
+    }
+
     // compute values for active nodes
     var NP = ListBuffer[Int]()
 
@@ -129,6 +142,7 @@ class Cgp (input: Int, output: Int, level: Int, row: Int, col: Int, funcs: List[
 
   def decode_cgp(points: ListBuffer[Int]): ListBuffer[Int] = {
     find_active_nodes()
+//    println(this.NU)
     return evaluate_cgp(points)
   }
 
