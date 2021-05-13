@@ -3,7 +3,7 @@ package main.scala
 import scala.collection.mutable.ListBuffer
 import scala.util.Random
 // Any type? or generic
-class Cgp (input: Int, output: Int, level: Int, row: Int, col: Int, funcs: List[List[Int] => Int]) {
+class Cgp (input: Int, output: Int, level: Int, row: Int, col: Int, funcs: List[List[BigDecimal] => BigDecimal]) {
   def num_input = input
   def num_output = output
   def arity = funcs.size
@@ -13,9 +13,9 @@ class Cgp (input: Int, output: Int, level: Int, row: Int, col: Int, funcs: List[
   val functions_options = funcs
   var node_list = ListBuffer[Node]()
   var NU = ListBuffer[Boolean]()
-  var evaluation_score: BigInt = 0
+  var evaluation_score: BigDecimal = 0
 
-  def set_evaluation_score(scoreToSet: BigInt): Unit = {
+  def set_evaluation_score(scoreToSet: BigDecimal): Unit = {
     this.evaluation_score = scoreToSet
   }
 
@@ -34,7 +34,7 @@ class Cgp (input: Int, output: Int, level: Int, row: Int, col: Int, funcs: List[
   def create_cgp(): Unit = {
     // add input nodes to the node list
     for (i <- 0 to (this.num_input - 1)) {
-      var input_node = new Node(-1, i, 0)
+      var input_node = new Node(-1, i, 0, 1.0)
       this.node_list += input_node
     }
 
@@ -44,7 +44,8 @@ class Cgp (input: Int, output: Int, level: Int, row: Int, col: Int, funcs: List[
       if ((i - this.num_input) % num_col == 0) {
         col_start += 1
       }
-      var inner_node = new Node(random_function(), i, col_start)
+      val r = scala.util.Random
+      var inner_node = new Node(random_function(), i, col_start, r.nextDouble * 2)
       this.node_list += inner_node // add node to the list
     }
 
@@ -63,7 +64,7 @@ class Cgp (input: Int, output: Int, level: Int, row: Int, col: Int, funcs: List[
 
     // connect edge to outputs
     for (i <- this.num_input + (this.num_row*this.num_col) to this.num_input + (this.num_row*this.num_col) + this.num_output - 1) {
-      var output_node = new Node(-1, i, this.num_col+1)
+      var output_node = new Node(-1, i, this.num_col+1, 1.0)
       this.node_list += output_node
       var col_from = this.num_col - this.lv_back + 1
       if (col_from < 0) col_from = 0
@@ -96,10 +97,10 @@ class Cgp (input: Int, output: Int, level: Int, row: Int, col: Int, funcs: List[
     r.nextInt(this.functions_options.size)
   }
 
-  def evaluate_cgp(points: ListBuffer[Int]): ListBuffer[Int] = {
+  def evaluate_cgp(points: ListBuffer[BigDecimal]): ListBuffer[BigDecimal] = {
     // if no active nodes, then output maps to input and just return the point then
     if (!this.NU.contains(true)) {
-      var predictions = ListBuffer[Int]()
+      var predictions = ListBuffer[BigDecimal]()
       for (point <- points) {
         predictions += point
       }
@@ -107,27 +108,27 @@ class Cgp (input: Int, output: Int, level: Int, row: Int, col: Int, funcs: List[
     }
 
     // compute values for active nodes
-    var NP = ListBuffer[Int]()
+    var NP = ListBuffer[BigDecimal]()
 
     // Set all to 0 to begin with
     for (i <- 0 to this.NU.length-1) {
-      NP += 0
+      NP += 0.0
     }
 
-    var predictions = ListBuffer[Int]()
+    var predictions = ListBuffer[BigDecimal]()
 
     for (point <- points) {
       for (cgp_node_idx <- 0 to this.NU.length-1) {
         if (NU(cgp_node_idx) == true) { // if it's active
           var node = this.node_list(cgp_node_idx + this.num_input) // offset so we can idx node in node_list
           // apply function to all incoming
-          var temp_vals = ListBuffer[Int]()
+          var temp_vals = ListBuffer[BigDecimal]()
           for (incoming_node <- node.incoming) {
             if (incoming_node.incoming.isEmpty) {
               temp_vals += point
             }
             else {
-              temp_vals += NP(incoming_node.number - num_input)
+              temp_vals += (NP(incoming_node.number - num_input)) * incoming_node.weight
             }
           }
           NP(cgp_node_idx) = this.functions_options(node.func_idx)(temp_vals.toList)
@@ -140,7 +141,7 @@ class Cgp (input: Int, output: Int, level: Int, row: Int, col: Int, funcs: List[
     return predictions
   }
 
-  def decode_cgp(points: ListBuffer[Int]): ListBuffer[Int] = {
+  def decode_cgp(points: ListBuffer[BigDecimal]): ListBuffer[BigDecimal] = {
     find_active_nodes()
 //    println(this.NU)
     return evaluate_cgp(points)
@@ -172,14 +173,32 @@ class Cgp (input: Int, output: Int, level: Int, row: Int, col: Int, funcs: List[
     }
   }
 
-  def mutate_cgp(probability: Double, is_node: Boolean, is_edge: Boolean): Unit = {
+//  def mutate_cgp(probability: Double, is_node: Boolean, is_edge: Boolean): Unit = {
+//    val r = new scala.util.Random
+//    for (node_idx <- this.num_input to node_list.size-1) {
+//      var rand_prob = r.nextDouble
+//      if (rand_prob <= probability) {
+//        if (is_node && is_edge) mutate_node(this.node_list(node_idx))
+//        else if (is_node) mutate_node(this.node_list(node_idx))
+//        else if (is_edge) mutate_incoming_edges(this.node_list(node_idx))
+//      }
+//    }
+//  }
+
+  def mutate_cgp(prob_mutate_edge: Double, prob_mutate_op: Double, prob_mutate_weight: Double): Unit = {
     val r = new scala.util.Random
     for (node_idx <- this.num_input to node_list.size-1) {
       var rand_prob = r.nextDouble
-      if (rand_prob <= probability) {
-        if (is_node && is_edge) mutate_node(this.node_list(node_idx))
-        else if (is_node) mutate_node(this.node_list(node_idx))
-        else if (is_edge) mutate_incoming_edges(this.node_list(node_idx))
+      if (rand_prob <= prob_mutate_edge) {
+        mutate_incoming_edges(this.node_list(node_idx))
+      }
+      rand_prob = r.nextDouble
+      if (rand_prob <= prob_mutate_op) {
+        mutate_operator(this.node_list(node_idx))
+      }
+      rand_prob = r.nextDouble
+      if (rand_prob <= prob_mutate_weight) {
+        mutate_operator(this.node_list(node_idx))
       }
     }
   }
@@ -219,6 +238,11 @@ class Cgp (input: Int, output: Int, level: Int, row: Int, col: Int, funcs: List[
   def mutate_node(node: Node): Unit = {
     mutate_operator(node)
     mutate_incoming_edges(node)
+  }
+
+  def mutate_node_weight(node: Node): Unit = {
+    val r = scala.util.Random
+    node.set_weight(r.nextDouble * 2)
   }
 
 }
