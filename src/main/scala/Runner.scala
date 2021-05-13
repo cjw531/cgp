@@ -4,6 +4,7 @@ import scala.collection.mutable.ListBuffer
 import scala.util.control.Breaks.break
 import java.io.FileWriter
 import java.io.{BufferedWriter, FileWriter}
+import java.util.concurrent.{Callable, FutureTask}
 import scala.math.BigDecimal.double2bigDecimal
 
 object Runner extends App {
@@ -114,11 +115,16 @@ object Runner extends App {
   var threshold = 100
 
   var num_generation = 0
+
+  val future = new FutureTask[String](new Callable[String]() {
+    def call(): String = {
+      searcher.search(target)
+    }
+  })
+
+  executor.execute(future)
+
   while (CGP_to_mutate.evaluation_score > threshold) {
-//    if (num_generations == 100000) {
-//      break
-//    }
-//    num_generations += 1
     var best_cgp = CGP_to_mutate
     var lowest_MSE = CGP_to_mutate.evaluation_score
     num_cgps_to_evaluate = 20
