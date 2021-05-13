@@ -3,15 +3,15 @@ package main.scala
 import scala.collection.mutable.ListBuffer
 
 class Functions {
-  def or(x:Int, y:Int): Unit = {
+  def or(x:Int, y:Int): Int = {
     return x | y
   }
 
-  def and(x:Int, y:Int): Unit = {
+  def and(x:Int, y:Int): Int = {
     return x & y
   }
 
-  def xor(x:Int, y:Int): Unit = {
+  def xor(x:Int, y:Int): Int = {
     return x ^ y
   }
 
@@ -41,7 +41,7 @@ class Functions {
   def multiply = (vals: List[Int]) => {vals.product}
 
 
-  def square(vals: List[Int]): Unit = {
+  def square(vals: List[Int]): List[Int] = {
     return vals.map(x => x*x)
   }
 
