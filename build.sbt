@@ -1,8 +1,8 @@
 enablePlugins(org.nlogo.build.NetLogoExtension)
 
-netLogoExtName      := "cgp-extension"
+netLogoExtName      := "cgp"
 
-netLogoClassManager := "Cgp"
+netLogoClassManager := "cgp"
 
 netLogoZipSources   := false
 

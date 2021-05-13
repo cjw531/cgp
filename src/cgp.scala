@@ -1,8 +1,33 @@
-package main.scala
+//package main.scala
+
+import org.nlogo.api._
+import org.nlogo.api.ScalaConversions._
+import org.nlogo.core.Syntax
+import org.nlogo.core.Syntax.{ NumberType, ListType }
 
 import scala.collection.mutable.ListBuffer
 import scala.util.Random
-// Any type? or generic
+
+class cgp extends DefaultClassManager {
+  def load(manager: PrimitiveManager) {
+    manager.addPrimitive("first-n-integers", new IntegerList)
+  }
+}
+
+class IntegerList extends Reporter {
+  override def getSyntax = Syntax.reporterSyntax(right = List(NumberType), ret = ListType)
+  def report(args: Array[Argument], context: Context): AnyRef = {
+    val n = try args(0).getIntValue
+    catch {
+      case e: LogoException =>
+        throw new ExtensionException(e.getMessage)
+    }
+    if (n < 0)
+      throw new ExtensionException("input must be positive")
+    (0 until n).toLogoList
+  }
+}
+/*
 class Cgp (input: Int, output: Int, level: Int, row: Int, col: Int, funcs: List[List[Int] => Int]) {
   def num_input = input
   def num_output = output
@@ -222,3 +247,4 @@ class Cgp (input: Int, output: Int, level: Int, row: Int, col: Int, funcs: List[
   }
 
 }
+*/
