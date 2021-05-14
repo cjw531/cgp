@@ -191,15 +191,17 @@ class Cgp (input: Int, output: Int, level: Int, row: Int, col: Int, funcs: List[
       var rand_prob = r.nextDouble
       if (rand_prob <= prob_mutate_edge) {
         mutate_incoming_edges(this.node_list(node_idx))
-      }
-      rand_prob = r.nextDouble
-      if (rand_prob <= prob_mutate_op) {
         mutate_operator(this.node_list(node_idx))
+        mutate_node_weight(this.node_list(node_idx))
       }
-      rand_prob = r.nextDouble
-      if (rand_prob <= prob_mutate_weight) {
-        mutate_operator(this.node_list(node_idx))
-      }
+//      rand_prob = r.nextDouble
+//      if (rand_prob <= prob_mutate_op) {
+//        mutate_operator(this.node_list(node_idx))
+//      }
+//      rand_prob = r.nextDouble
+//      if (rand_prob <= prob_mutate_weight) {
+//        mutate_operator(this.node_list(node_idx))
+//      }
     }
   }
 

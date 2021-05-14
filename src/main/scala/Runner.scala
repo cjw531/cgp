@@ -12,11 +12,11 @@ object Runner extends App {
 //  val outputFile = new BufferedWriter(new FileWriter("EvalsOverGenInt.csv"))
 
 
-  val csvWriter = new FileWriter("EvalsOverGenDouble_newpoints_try.csv")
-  csvWriter.append("Generation")
-  csvWriter.append(",")
-  csvWriter.append("Evaluation Score")
-  csvWriter.append("\n")
+//  val csvWriter = new FileWriter("EvalsOverGenDouble_newpoints_try.csv")
+//  csvWriter.append("Generation")
+//  csvWriter.append(",")
+//  csvWriter.append("Evaluation Score")
+//  csvWriter.append("\n")
 
 
   var num_input = 1
@@ -37,11 +37,12 @@ object Runner extends App {
 
   // Generate sample of points
   def generate_points(): ListBuffer[BigDecimal] = {
-    var number_of_points = 10000
+    var number_of_points = 500
     val r = scala.util.Random
     var sample_points = ListBuffer[BigDecimal]()
     for (i <- 1 to number_of_points) {
-      sample_points += r.nextDouble * 50
+      sample_points += r.nextDouble * 10
+      sample_points += r.nextDouble * -10
     }
     return sample_points
   }
@@ -116,13 +117,13 @@ object Runner extends App {
 
   var num_generation = 0
 
-  val future = new FutureTask[String](new Callable[String]() {
-    def call(): String = {
-      searcher.search(target)
-    }
-  })
-
-  executor.execute(future)
+//  val future = new FutureTask[String](new Callable[String]() {
+//    def call(): String = {
+//      searcher.search(target)
+//    }
+//  })
+//
+//  executor.execute(future)
 
   while (CGP_to_mutate.evaluation_score > threshold) {
     var best_cgp = CGP_to_mutate
@@ -146,7 +147,9 @@ object Runner extends App {
         }
       }
       // Mutate
-      mutated_cgp.mutate_cgp(0.3, 0.05, 0.02)
+      // lower mutation to change edges
+      // adaptive mutation rate
+      mutated_cgp.mutate_cgp(0.05, 0.01, 0.01)
       sample_points = generate_points()
       var preds = mutated_cgp.decode_cgp(sample_points)
       true_values =  evaluate_sample_points_true(sample_points)
@@ -170,15 +173,25 @@ object Runner extends App {
     CGP_to_mutate = best_cgp
     println(CGP_to_mutate.evaluation_score)
 
-    csvWriter.append(num_generation.toString())
-    csvWriter.append(",")
-    csvWriter.append(CGP_to_mutate.evaluation_score.toString())
-    csvWriter.append("\n")
+    print("Points: ")
+    println(sample_points)
+
+    print("Predictions: ")
+    println(best_cgp.decode_cgp(sample_points))
+
+    print("True vals: ")
+    println(evaluate_sample_points_true(sample_points))
+
+//    csvWriter.append(num_generation.toString())
+//    csvWriter.append(",")
+//    csvWriter.append(CGP_to_mutate.evaluation_score.toString())
+//    csvWriter.append("\n")
+
 
     num_generation += 1
   } // end of while loop for generations
 
-  csvWriter.flush()
-  csvWriter.close()
+//  csvWriter.flush()
+//  csvWriter.close()
 
 } // end of class
