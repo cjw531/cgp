@@ -1,9 +1,35 @@
 extensions [cgp]
+
+to generate-point
+  let points cgp:rand-point num-point
+  show points
+end
+
+to true-value
+  let values cgp:true-value
+  show values
+end
+
+to generate-cgp
+  let first-result cgp:init_cgp
+  show word "Best CGP #: " item 0 first-result
+  show word "Best evaluation score: " item 1 first-result
+end
+
+to go
+  let iter 0
+  let eval-score 0
+  while [iter < num-generation and eval-score > 100] [
+    set iter iter + 1
+    set eval-score cgp:mutate_breed mutation-rate
+    show word "Score: " eval-score
+  ]
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
-210
+236
 10
-647
+673
 448
 -1
 -1
@@ -28,12 +54,12 @@ ticks
 30.0
 
 BUTTON
-23
-63
-96
-96
+108
+18
+223
+51
 NIL
-setup
+generate-point
 NIL
 1
 T
@@ -43,6 +69,90 @@ NIL
 NIL
 NIL
 1
+
+INPUTBOX
+18
+16
+100
+91
+num-point
+100.0
+1
+0
+Number
+
+BUTTON
+108
+56
+224
+89
+NIL
+true-value
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+126
+130
+224
+163
+NIL
+generate-cgp
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+INPUTBOX
+18
+198
+141
+258
+num-generation
+10000.0
+1
+0
+Number
+
+BUTTON
+151
+210
+219
+243
+NIL
+go
+T
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+INPUTBOX
+18
+119
+120
+179
+mutation-rate
+0.05
+1
+0
+Number
 
 @#$#@#$#@
 ## WHAT IS IT?
