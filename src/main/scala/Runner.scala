@@ -1,23 +1,9 @@
 package main.scala
 
 import scala.collection.mutable.ListBuffer
-import scala.util.control.Breaks.break
-import java.io.FileWriter
-import java.io.{BufferedWriter, FileWriter}
-import java.util.concurrent.{Callable, FutureTask}
 import scala.math.BigDecimal.double2bigDecimal
 
 object Runner extends App {
-
-//  val outputFile = new BufferedWriter(new FileWriter("EvalsOverGenInt.csv"))
-
-
-//  val csvWriter = new FileWriter("EvalsOverGenDouble_newpoints_try.csv")
-//  csvWriter.append("Generation")
-//  csvWriter.append(",")
-//  csvWriter.append("Evaluation Score")
-//  csvWriter.append("\n")
-
 
   var num_input = 1
   var num_output = 1
@@ -37,7 +23,7 @@ object Runner extends App {
 
   // Generate sample of points
   def generate_points(): ListBuffer[BigDecimal] = {
-    var number_of_points = 500
+    var number_of_points = 50
     val r = scala.util.Random
     var sample_points = ListBuffer[BigDecimal]()
     for (i <- 1 to number_of_points) {
@@ -48,9 +34,6 @@ object Runner extends App {
   }
 
   var sample_points = generate_points()
-
-  print("Points: ")
-  println(sample_points)
 
   // define true function to evaluate
   def func(x: BigDecimal): BigDecimal = {
@@ -65,11 +48,7 @@ object Runner extends App {
     }
     return true_values
   }
-
   var true_values = evaluate_sample_points_true(sample_points)
-
-  print("True values: ")
-  println(true_values)
 
   // initially create CGPs and find the best one
   for (i <- 0 to num_cgps_to_evaluate) {
@@ -77,11 +56,8 @@ object Runner extends App {
     CGP.create_cgp()
 
     var preds = CGP.decode_cgp(sample_points)
-    print("Predictions: ")
-    println(preds)
-    // squared difference
 
-    // how are preds
+    // Compute MSE to compare preds to true vals
     var diff = ListBuffer[BigDecimal]()
     for (i <- 0 to preds.length-1) {
       diff += (true_values(i) - preds(i))
@@ -91,8 +67,12 @@ object Runner extends App {
       diff_squared += diff(i).pow(2)
     }
     CGP.evaluation_score = diff_squared.sum
+
+    // Print out evaluation score to see how did
     print("Evaluation Score: ")
     println(CGP.evaluation_score)
+
+    // Check if this is the best evaluation score
     if (i == 0) {
       best_cgp_idx = i
       lowest_cgp_metric_val = CGP.evaluation_score
@@ -117,18 +97,33 @@ object Runner extends App {
 
   var num_generation = 0
 
-//  val future = new FutureTask[String](new Callable[String]() {
-//    def call(): String = {
-//      searcher.search(target)
-//    }
-//  })
-//
-//  executor.execute(future)
 
-  while (CGP_to_mutate.evaluation_score > threshold) {
+  // calculate score for parent again
+
+  // Create offspring and evaluate them
+  while (CGP_to_mutate.evaluation_score > threshold) { // iterate until zeros out, essentially
+    // Evaluate error for the best CGP again
     var best_cgp = CGP_to_mutate
-    var lowest_MSE = CGP_to_mutate.evaluation_score
-    num_cgps_to_evaluate = 20
+    sample_points = generate_points()
+    var preds = best_cgp.decode_cgp(sample_points)
+    true_values =  evaluate_sample_points_true(sample_points)
+    var diff = ListBuffer[BigDecimal]()
+    for (i <- 0 to preds.length - 1) {
+      diff += (true_values(i) - preds(i))
+    }
+    var diff_squared = ListBuffer[BigDecimal]()
+    for (i <- 0 to diff.length - 1) {
+      diff_squared += diff(i).pow(2)
+    }
+    best_cgp.evaluation_score = diff_squared.sum
+
+    // set this error to be compared to
+    var lowest_MSE = best_cgp.evaluation_score
+
+    // Set how many offspring to create
+    num_cgps_to_evaluate = 100
+
+    // Create an offspring from a deep copy, mutate it, and then decode it and evaluate its error
     for (i <- 0 to num_cgps_to_evaluate - 1) {
       // Make new CGP with same properties as parent
       var mutated_cgp = new Cgp(1, num_output, lv_back, num_row, num_col, function_options)
@@ -147,9 +142,8 @@ object Runner extends App {
         }
       }
       // Mutate
-      // lower mutation to change edges
-      // adaptive mutation rate
-      mutated_cgp.mutate_cgp(0.05, 0.01, 0.01)
+      // TODO: adaptive mutation rate
+      mutated_cgp.mutate_cgp(0.05)
       sample_points = generate_points()
       var preds = mutated_cgp.decode_cgp(sample_points)
       true_values =  evaluate_sample_points_true(sample_points)
@@ -163,6 +157,8 @@ object Runner extends App {
         diff_squared += diff(i).pow(2)
       }
       mutated_cgp.evaluation_score = diff_squared.sum
+
+      // Compare and see if this CGP outperformed the previous best
       if (mutated_cgp.evaluation_score.compareTo(lowest_MSE) < 0) {
         lowest_MSE = mutated_cgp.evaluation_score
         best_cgp = mutated_cgp
@@ -173,6 +169,9 @@ object Runner extends App {
     CGP_to_mutate = best_cgp
     println(CGP_to_mutate.evaluation_score)
 
+    print("Generation number: ")
+    println(num_generation)
+
     print("Points: ")
     println(sample_points)
 
@@ -182,16 +181,8 @@ object Runner extends App {
     print("True vals: ")
     println(evaluate_sample_points_true(sample_points))
 
-//    csvWriter.append(num_generation.toString())
-//    csvWriter.append(",")
-//    csvWriter.append(CGP_to_mutate.evaluation_score.toString())
-//    csvWriter.append("\n")
-
-
     num_generation += 1
   } // end of while loop for generations
 
-//  csvWriter.flush()
-//  csvWriter.close()
 
 } // end of class
