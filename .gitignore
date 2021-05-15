@@ -2,3 +2,9 @@
 *.log
 *.idea
 *.iml
+.bsp/
+.bundledFiles
+project/project/
+project/target/
+target/
+.cgp.tmp.nlogo
