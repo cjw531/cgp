@@ -220,14 +220,47 @@ class cgp extends api.DefaultClassManager {
           predictions += NP(incoming_node.number - this.num_input)
         }
       }
+      import scala.math.abs
 
       // convert predictions so that they are probabilities that sum to 1
-//      predictions = predictions.map(x => if (x < 0) x*0 else x)
-//      var total = predictions.sum
-//      if (total > 0) {predictions = predictions.map(x => x / total)}
-//      else {predictions = ListBuffer(0.0,0.0,0.0)}
+      predictions = predictions.map(x => scala.math.abs(x))
 
-      val g_index= predictions.indexOf(predictions.max)
+//      return predictions
+
+      var total = predictions.sum
+
+      var g_index = 0
+      if (total > 0) {
+        predictions = predictions.map(x => x / total)
+        // weighted choice: https://softwareengineering.stackexchange.com/questions/150616/get-weighted-random-item
+
+        // Calculate the cumulative sums of the weights
+        var cum_sum = ListBuffer[Double]()
+        var ongoing_sum = 0.0
+        for (pred <- predictions) {
+          ongoing_sum = ongoing_sum + pred
+          cum_sum += ongoing_sum
+        }
+
+        // Generate a random number n in the range of 0 to sum(weights)
+        val r = scala.util.Random
+        var rand_num = r.nextDouble * predictions.sum
+
+        // Find the last item whose cumulative sum is above n
+        var idx = 0
+        for (i <- cum_sum) {
+          if (i > rand_num) {
+            g_index = idx
+          }
+          idx += 1
+        }
+      }
+      else {
+        predictions = ListBuffer(0.0,0.0,0.0)
+        return predictions
+      }
+
+//      val g_index= predictions.indexOf(predictions.max)
       if (g_index == 0) {
         predictions = ListBuffer(1.0, 0.0, 0.0)
       }

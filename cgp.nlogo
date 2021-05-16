@@ -1,79 +1,67 @@
 extensions [cgp]
 
-turtles-own [energy]
-inmates-own [age]
-officers-own [age]
+elephants-own [energy]
+patches-own [countdown]
 
-breed [busses bus]
-breed [inmates inmate]
-breed [officers officer]
+breed [elephants elephant]
+breed [poachers poacher]
+breed [rangers ranger]
 
 
 to setup
   clear-all
   reset-ticks
 
-  create-busses 10 [
+  create-elephants num-elephants [
     setxy random-xcor random-ycor
-    set color orange
-    set shape "bus"
-    set size 2.5
+    set color gray + 2
+    set shape "elephant"
+    set size 4
     set energy 100
-    set heading 90
+    set heading 0
     cgp:add-cgps
   ]
 
+   create-poachers num-poachers [
+    setxy random-xcor random-ycor
+    set shape "person"
+    set color white
+    set size 2.0
+  ]
 
-  let starting-inmates-number 10
-
-  repeat starting-inmates-number [
-    ask one-of patches with [not any? inmates-here] [sprout-inmates 1 [
+  repeat num-rangers [
+    ask one-of patches with [not any? rangers-here] [sprout-rangers 1 [
       set shape "person"
-      set color orange
-      set size 1.5
-      set age 1
+      set color black
+      set size 2.0
       ]
     ]
   ]
-
-  let starting-officers-number 5
-
-  repeat starting-officers-number [
-    ask one-of patches with [not any? officers-here] [sprout-officers 1 [
-      set shape "person"
-      set color blue
-      set size 1.5
-      set age 1
-      ]
-    ]
-  ]
-
   ask patches [
-   set pcolor gray + 1
-  ]
-end
-
-to print-cgps
-  ask busses[
-    let cgps cgp:get-cgp-list
-    show cgps
+    set pcolor one-of [ green brown ]
+    ifelse pcolor = green
+    [
+      set countdown (grass-regrowth-time * 5)
+    ]
+    [
+      set countdown random (grass-regrowth-time * 5)
+    ]
   ]
 end
 
 
 to go
-  ;; call cgp method
-  ;;;;;;;; tells us what action to take (move in what direction)
-  ;; feed in cgp method info about observation
-  ;;;;; input: []
-  ;;;;; output: [no-turn-prob, left-turn-prob, right-turn-prob]
-  ;;;;; output_example: [0.5,    0.3,             0.2,     0.1]
-  ;;;;; pick with those probabilities which action to take
-
-  ask busses [
+  ask elephants [
     let obs get-observations
     let action-vector cgp:get-action obs
     show action-vector
+    if action-vector = (list 0 0 0 )
+    [
+      let action one-of [1 2 3]
+      if action = 1 [fd 1]
+      if action = 2 [fd 2]
+      if action = 3 [fd 3]
+    ]
     if action-vector = (list 1 0 0)
     [
       fd 1
@@ -81,91 +69,34 @@ to go
     if action-vector = (list 0 1 0)
     [
       lt 20
-      fd 1
     ]
     if action-vector = (list 0 0 1)
     [
       rt 20
-      fd 1
     ]
-    ;; let probs cgp:get-action
-    ;; takes action
     eat
     reproduce
     check-death
     set energy energy - 1
   ]
 
-  ask inmates [
-    set age age + 1
-    people-death
+  ask patches [
+   grow-grass
   ]
-  ask officers [
-    set age age + 1
-    people-death
-  ]
-
-  create-new-people
 
   tick
 end
 
 
 to eat
-  if any? inmates-here [
-    ask (one-of inmates-here) [die]
-    set energy energy + 20
-  ]
-  if any? officers-here [
-    ask (one-of officers-here) [die]
-    set energy energy - 20
-  ]
-end
-
-to draw-cone [degrees depth]
-  rt degrees / 2.0
-  pd
-  fd depth
-  lt 180 - ((180 - degrees) / 2.0)
-  fd sqrt (2 * depth ^ 2 * (1 - cos degrees))
-  lt 180 - ((180 - degrees) / 2.0)
-  fd depth
-  lt 180 - (degrees / 2.0)
-  pu
-end
-
-to draw-cones [offset depth degrees num]
-  hatch 1 [
-    hide-turtle
-    set color white
-    lt offset
-    repeat num [
-      draw-cone degrees depth
-      rt degrees
-    ]
-    lt offset + degrees
-    die
-  ]
-end
-
-to remove-cones [offset depth degrees num]
-  hatch 1 [
-    hide-turtle
-    set color gray + 1
-    lt offset
-    repeat num [
-      draw-cone degrees depth
-      rt degrees
-    ]
-    lt offset + degrees
-    die
+  if pcolor = green [
+    set pcolor brown
+    set energy energy + elephant-gain-from-food
   ]
 end
 
 
 to-report get-observations
-;  draw-cones (3 * 20 / 2 - 20 / 2) 5 20 3
-
   let obs []
   rt 20
   repeat 3 [
@@ -180,56 +111,44 @@ end
 to-report get-in-cone [dist angle]
   let obs []
   let cone other turtles in-cone 5 20
-  let b min-one-of cone with [is-bus? self] [distance myself]
-  if-else b = nobody [
+  let el min-one-of cone with [is-elephant? self] [distance myself]
+  if-else el = nobody [
     set obs lput 0 obs
   ]
   [
-    set obs lput (5 - ((distance b) / 2)) obs
+    set obs lput (5 - ((distance el) / 2)) obs
   ]
-  let i min-one-of cone with [is-inmate? self] [distance myself]
-  if-else i = nobody [
+  let p min-one-of cone with [is-poacher? self] [distance myself]
+  if-else p = nobody [
     set obs lput 0 obs
   ]
   [
-    set obs lput (5 - ((distance i) / 2)) obs
+    set obs lput (5 - ((distance p) / 2)) obs
   ]
-   let o min-one-of cone with [is-officer? self] [distance myself]
-  if-else o = nobody [
+   let r min-one-of cone with [is-ranger? self] [distance myself]
+  if-else r = nobody [
     set obs lput 0 obs
   ]
   [
-    set obs lput (5 - ((distance o) / 2)) obs
+    set obs lput (5 - ((distance r) / 2)) obs
   ]
 
   report obs
 end
 
-;; Check if person should die
-to people-death
-  if age > 65 [die]
+to grow-grass
+  if pcolor = brown [
+   ifelse countdown <= 0
+   [
+      set pcolor green
+      set countdown (grass-regrowth-time * 5)
+   ]
+   [
+      set countdown countdown - 1
+   ]
+  ]
 end
 
-to create-new-people
-  if random 100 < 10 [
-    ask one-of patches with [not any? inmates-here] [sprout-inmates 1 [
-      set shape "person"
-      set color orange
-      set size 1.5
-      set age 1
-      ]
-    ]
-  ]
-  if random 100 < 5 [
-    ask one-of patches with [not any? officers-here] [sprout-officers 1 [
-      set shape "person"
-      set color blue
-      set size 1.5
-      set age 1
-      ]
-    ]
-  ]
-end
 
 to move
   fd 1
@@ -242,39 +161,6 @@ end
 to check-death
   if energy < 0 [die]
 end
-
-
-;;; current ideas
-;;;;;;;; mouse reproduce calls mutation which gives its offspring one of the mutated cgps
-;;;;;;;; mouse takes in list of inputs based on its observations and passes into cgp
-;;;;;;;; cgp black box returns a list of outputs and the mouse selects with prob which one to do
-
-to generate-point
-  clear-all
-  let points cgp:rand-point num-point
-  show points
-end
-
-to true-value
-  let values cgp:true-value
-  show values
-end
-
-to generate-cgp
-  let first-result cgp:init_cgp
-  show word "Best CGP #: " item 0 first-result
-  show word "Best evaluation score: " item 1 first-result
-end
-
-;to go
-;  let iter 0
-;  let eval-score 0
-;  while [iter < num-generation and eval-score > 100] [
-;    set iter iter + 1
-;    set eval-score cgp:mutate_breed mutation-rate
-;    show word "Score: " eval-score
-;  ]
-;end
 @#$#@#$#@
 GRAPHICS-WINDOW
 236
@@ -304,83 +190,10 @@ ticks
 30.0
 
 BUTTON
-108
-18
-223
-51
-NIL
-generate-point
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-INPUTBOX
-18
-16
-100
-91
-num-point
-100.0
-1
-0
-Number
-
-BUTTON
-108
-56
-224
-89
-NIL
-true-value
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-BUTTON
-126
-130
-224
-163
-NIL
-generate-cgp
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-INPUTBOX
-18
-198
-141
-258
-num-generation
-10000.0
-1
-0
-Number
-
-BUTTON
-711
-69
-779
-102
+120
+241
+188
+274
 NIL
 go
 T
@@ -393,22 +206,11 @@ NIL
 NIL
 1
 
-INPUTBOX
-18
-119
-120
-179
-mutation-rate
-0.05
-1
-0
-Number
-
 BUTTON
-711
-13
-777
-46
+26
+240
+92
+273
 NIL
 setup
 NIL
@@ -421,35 +223,124 @@ NIL
 NIL
 1
 
-BUTTON
-693
-156
-791
-189
-NIL
-print-cgps
-NIL
+SLIDER
+21
+14
+193
+47
+num-elephants
+num-elephants
+0
+100
+10.0
 1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
 1
+NIL
+HORIZONTAL
+
+SLIDER
+21
+55
+193
+88
+num-poachers
+num-poachers
+0
+100
+4.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+21
+96
+193
+129
+num-rangers
+num-rangers
+0
+100
+2.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+8
+142
+226
+175
+elephant-gain-from-food
+elephant-gain-from-food
+0
+100
+2.0
+1
+1
+NIL
+HORIZONTAL
+
+PLOT
+707
+139
+1015
+418
+Populations
+NIL
+NIL
+0.0
+10.0
+0.0
+10.0
+true
+true
+"" ""
+PENS
+"elephants" 1.0 0 -16777216 true "" "plot count elephants"
+
+SLIDER
+18
+184
+203
+217
+grass-regrowth-time
+grass-regrowth-time
+0
+100
+100.0
+1
+1
+NIL
+HORIZONTAL
+
+MONITOR
+798
+50
+886
+95
+max-energy
+max [energy] of elephants
+17
+1
+11
 
 @#$#@#$#@
 ## WHAT IS IT?
 
-(a general understanding of what the model is trying to show or explain)
+Elephants, Poacher, Ranger model where poachers kill elephants and rangers kill poachers
 
 ## HOW IT WORKS
 
-(what rules the agents use to create the overall behavior of the model)
+Agents call the cgp extension to get their next best action.
 
 ## HOW TO USE IT
 
-(how to use the model, including a description of each of the items in the Interface tab)
+num-elephants: number of elephants to create intiially 
+num-rangers: number of rangers to create initially
+num-poachers: number of poachers to create initially
 
 ## THINGS TO NOTICE
 
@@ -577,6 +468,16 @@ dot
 false
 0
 Circle -7500403 true true 90 90 120
+
+elephant
+true
+0
+Polygon -7500403 true true 60 150
+Polygon -7500403 true true 30 165 75 105 180 105 180 150 180 105 240 105 270 150 255 210 240 225 225 210 240 180 210 195 210 240 180 240 180 195 135 195 120 210 135 240 90 240 90 195 60 180 60 150 30 180 30 165
+Circle -16777216 false false 255 150 0
+Circle -1 false false 255 150 0
+Circle -1 false false 255 150 0
+Circle -1 true false 225 135 0
 
 face happy
 false
