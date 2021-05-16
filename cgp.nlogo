@@ -1,6 +1,213 @@
 extensions [cgp]
 
+turtles-own [energy]
+inmates-own [age]
+officers-own [age]
+
+breed [busses bus]
+breed [inmates inmate]
+breed [officers officer]
+
+
+to setup
+  clear-all
+  reset-ticks
+
+  create-busses 10 [
+    setxy random-xcor random-ycor
+    set color orange
+    set shape "bus"
+    set size 2.5
+    set energy 100
+    set heading 90
+    cgp:add-cgps
+  ]
+
+
+  let starting-inmates-number 10
+
+  repeat starting-inmates-number [
+    ask one-of patches with [not any? inmates-here] [sprout-inmates 1 [
+      set shape "person"
+      set color orange
+      set size 1.5
+      set age 1
+      ]
+    ]
+  ]
+
+  let starting-officers-number 5
+
+  repeat starting-officers-number [
+    ask one-of patches with [not any? officers-here] [sprout-officers 1 [
+      set shape "person"
+      set color blue
+      set size 1.5
+      set age 1
+      ]
+    ]
+  ]
+
+  ask patches [
+   set pcolor gray + 1
+  ]
+end
+
+to print-cgps
+  ask busses[
+    let cgps cgp:get-cgp-list
+    show cgps
+  ]
+end
+
+
+to go
+  ;; call cgp method
+  ;;;;;;;; tells us what action to take (move in what direction)
+  ;; feed in cgp method info about observation
+  ;;;;; input: []
+  ;;;;; output: [left-turn-prob, right-turn-prob, up-prob, down-prob]
+  ;;;;; output_example: [0.5,    0.3,             0.2,     0.1]
+  ;;;;; pick with those probabilities which action to take
+
+  ask busses [
+    let obs get-observations
+;    show obs
+    let result cgp:get-action obs
+    show result
+    ;; let probs cgp:get-action
+    ;; takes action
+    reproduce
+    check-death
+  ]
+
+  ask inmates [
+    set age age + 1
+    people-death
+  ]
+  ask officers [
+    set age age + 1
+    people-death
+  ]
+
+  create-new-people
+  tick
+end
+
+to draw-cone [degrees depth]
+  rt degrees / 2.0
+  pd
+  fd depth
+  lt 180 - ((180 - degrees) / 2.0)
+  fd sqrt (2 * depth ^ 2 * (1 - cos degrees))
+  lt 180 - ((180 - degrees) / 2.0)
+  fd depth
+  lt 180 - (degrees / 2.0)
+  pu
+end
+
+to draw-cones [offset depth degrees num]
+  hatch 1 [
+    hide-turtle
+    set color white
+    lt offset
+    repeat num [
+      draw-cone degrees depth
+      rt degrees
+    ]
+    lt offset + degrees
+    die
+  ]
+end
+
+to-report get-observations
+  draw-cones (3 * 20 / 2 - 20 / 2) 5 20 3
+
+  let obs []
+  rt 20
+  repeat 3 [
+    set obs sentence obs (get-in-cone 5 20)
+    lt 20
+  ]
+  rt 40
+  set obs map [i -> i / 5] obs
+  report obs
+end
+
+to-report get-in-cone [dist angle]
+  let obs []
+  let cone other turtles in-cone 5 20
+  let b min-one-of cone with [is-bus? self] [distance myself]
+  if-else b = nobody [
+    set obs lput 0 obs
+  ]
+  [
+    set obs lput (5 - ((distance b) / 2)) obs
+  ]
+  let i min-one-of cone with [is-inmate? self] [distance myself]
+  if-else i = nobody [
+    set obs lput 0 obs
+  ]
+  [
+    set obs lput (5 - ((distance i) / 2)) obs
+  ]
+   let o min-one-of cone with [is-officer? self] [distance myself]
+  if-else o = nobody [
+    set obs lput 0 obs
+  ]
+  [
+    set obs lput (5 - ((distance o) / 2)) obs
+  ]
+
+  report obs
+end
+
+;; Check if person should die
+to people-death
+  if age > 65 [die]
+end
+
+to create-new-people
+  if random 100 < 10 [
+    ask one-of patches with [not any? inmates-here] [sprout-inmates 1 [
+      set shape "person"
+      set color orange
+      set size 1.5
+      set age 1
+      ]
+    ]
+  ]
+  if random 100 < 5 [
+    ask one-of patches with [not any? officers-here] [sprout-officers 1 [
+      set shape "person"
+      set color blue
+      set size 1.5
+      set age 1
+      ]
+    ]
+  ]
+end
+
+to move
+  fd 1
+end
+
+to reproduce
+  ;; in here, mutate to generate an offspring
+end
+
+to check-death
+  if energy < 0 [die]
+end
+
+
+;;; current ideas
+;;;;;;;; mouse reproduce calls mutation which gives its offspring one of the mutated cgps
+;;;;;;;; mouse takes in list of inputs based on its observations and passes into cgp
+;;;;;;;; cgp black box returns a list of outputs and the mouse selects with prob which one to do
+
 to generate-point
+  clear-all
   let points cgp:rand-point num-point
   show points
 end
@@ -16,15 +223,15 @@ to generate-cgp
   show word "Best evaluation score: " item 1 first-result
 end
 
-to go
-  let iter 0
-  let eval-score 0
-  while [iter < num-generation and eval-score > 100] [
-    set iter iter + 1
-    set eval-score cgp:mutate_breed mutation-rate
-    show word "Score: " eval-score
-  ]
-end
+;to go
+;  let iter 0
+;  let eval-score 0
+;  while [iter < num-generation and eval-score > 100] [
+;    set iter iter + 1
+;    set eval-score cgp:mutate_breed mutation-rate
+;    show word "Score: " eval-score
+;  ]
+;end
 @#$#@#$#@
 GRAPHICS-WINDOW
 236
@@ -47,8 +254,8 @@ GRAPHICS-WINDOW
 16
 -16
 16
-0
-0
+1
+1
 1
 ticks
 30.0
@@ -127,10 +334,10 @@ num-generation
 Number
 
 BUTTON
-151
-210
-219
-243
+711
+69
+779
+102
 NIL
 go
 T
@@ -153,6 +360,40 @@ mutation-rate
 1
 0
 Number
+
+BUTTON
+711
+13
+777
+46
+NIL
+setup
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+693
+156
+791
+189
+NIL
+print-cgps
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
 
 @#$#@#$#@
 ## WHAT IS IT?
@@ -224,6 +465,25 @@ Circle -7500403 true true 110 127 80
 Circle -7500403 true true 110 75 80
 Line -7500403 true 150 100 80 30
 Line -7500403 true 150 100 220 30
+
+bus
+false
+0
+Polygon -7500403 true true 15 206 15 150 15 120 30 105 270 105 285 120 285 135 285 206 270 210 30 210
+Rectangle -16777216 true false 36 126 231 159
+Line -7500403 false 60 135 60 165
+Line -7500403 false 60 120 60 165
+Line -7500403 false 90 120 90 165
+Line -7500403 false 120 120 120 165
+Line -7500403 false 150 120 150 165
+Line -7500403 false 180 120 180 165
+Line -7500403 false 210 120 210 165
+Line -7500403 false 240 135 240 165
+Rectangle -16777216 true false 15 174 285 182
+Circle -16777216 true false 48 187 42
+Rectangle -16777216 true false 240 127 276 205
+Circle -16777216 true false 195 187 42
+Line -7500403 false 257 120 257 207
 
 butterfly
 true

@@ -4,7 +4,9 @@ import api.ScalaConversions._
 import api.{Argument, Context, ExtensionManager, ScalaConversions}
 import org.nlogo.core.AgentKind
 
+import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
+import scala.math.BigDecimal.double2bigDecimal
 import scala.util.Random
 
 class cgp extends api.DefaultClassManager {
@@ -31,7 +33,7 @@ class cgp extends api.DefaultClassManager {
   }
 
   /* Cgp Class */
-  class Cgp (input: Int, output: Int, level: Int, row: Int, col: Int, funcs: List[List[Int] => Int]) {
+  class Cgp (input: Int, output: Int, level: Int, row: Int, col: Int, funcs: List[List[Double] => Double]) {
     def num_input = input
     def num_output = output
     def arity = funcs.size
@@ -41,9 +43,9 @@ class cgp extends api.DefaultClassManager {
     val functions_options = funcs
     var node_list = ListBuffer[Node]()
     var NU = ListBuffer[Boolean]()
-    var evaluation_score: BigInt = 0
+    var evaluation_score: Double = 0
 
-    def set_evaluation_score(scoreToSet: BigInt): Unit = {
+    def set_evaluation_score(scoreToSet: Double): Unit = {
       this.evaluation_score = scoreToSet
     }
 
@@ -124,10 +126,10 @@ class cgp extends api.DefaultClassManager {
       r.nextInt(this.functions_options.size)
     }
 
-    def evaluate_cgp(points: ListBuffer[Int]): ListBuffer[Int] = {
+    def evaluate_cgp(points: ListBuffer[Double]): ListBuffer[Double] = {
       // if no active nodes, then output maps to input and just return the point then
       if (!this.NU.contains(true)) {
-        var predictions = ListBuffer[Int]()
+        var predictions = ListBuffer[Double]()
         for (point <- points) {
           predictions += point
         }
@@ -135,21 +137,21 @@ class cgp extends api.DefaultClassManager {
       }
 
       // compute values for active nodes
-      var NP = ListBuffer[Int]()
+      var NP = ListBuffer[Double]()
 
       // Set all to 0 to begin with
       for (i <- 0 to this.NU.length-1) {
         NP += 0
       }
 
-      var predictions = ListBuffer[Int]()
+      var predictions = ListBuffer[Double]()
 
       for (point <- points) {
         for (cgp_node_idx <- 0 to this.NU.length-1) {
           if (NU(cgp_node_idx) == true) { // if it's active
             var node = this.node_list(cgp_node_idx + this.num_input) // offset so we can idx node in node_list
             // apply function to all incoming
-            var temp_vals = ListBuffer[Int]()
+            var temp_vals = ListBuffer[Double]()
             for (incoming_node <- node.incoming) {
               if (incoming_node.incoming.isEmpty) {
                 temp_vals += point
@@ -168,10 +170,64 @@ class cgp extends api.DefaultClassManager {
       return predictions
     }
 
-    def decode_cgp(points: ListBuffer[Int]): ListBuffer[Int] = {
+    def decode_cgp(points: ListBuffer[Double]): ListBuffer[Double] = {
       find_active_nodes()
       //    println(this.NU)
       return evaluate_cgp(points)
+    }
+
+    def solve_cgp(inputs_list: List[Double]): ListBuffer[Double] = {
+      var predictions = ListBuffer[Double]()
+
+      // if no active nodes, then output maps to input and just return the point then
+      if (!this.NU.contains(true)) {
+        for (output_node <- (this.num_input + (this.num_row + this.num_col)) to (this.num_input + (this.num_row + this.num_col) + this.num_output - 1)) {
+          for (incoming_node <- this.node_list(output_node).incoming) {
+            predictions += inputs_list(incoming_node.number)
+          }
+        }
+        return predictions
+      }
+
+      var NP = ListBuffer[Double]()
+      // Set all to 0 to begin with
+      for (i <- 0 to this.NU.length-1) {
+        NP += 0
+      }
+
+      for (cgp_node_idx <- 0 to this.NU.length-1) {
+        if (NU(cgp_node_idx) == true) {
+          var node = this.node_list(cgp_node_idx + this.num_input) // offset so we can idx node in node_list
+          var temp_vals = ListBuffer[Double]()
+          for (incoming_node <- node.incoming) {
+            if (incoming_node.incoming.isEmpty) {
+              temp_vals += inputs_list(incoming_node.number)
+            }
+            else {
+              temp_vals += NP(incoming_node.number - this.num_input)
+            }
+          }
+          NP(cgp_node_idx) = this.functions_options(node.func_idx)(temp_vals.toList)
+        }
+      }
+
+      for (output_node <- (this.num_input + (this.num_row * this.num_col)) to (this.num_input + (this.num_row * this.num_col) + this.num_output - 1)) {
+        var incoming_node = this.node_list(output_node).incoming(0)
+        if (incoming_node.incoming.isEmpty) {
+          predictions += inputs_list(incoming_node.number)
+        }
+        else {
+          predictions += NP(incoming_node.number - this.num_input)
+        }
+      }
+
+      // convert predictions so that they are probabilities that sum to 1
+      predictions = predictions.map(x => if (x < 0) x*0 else x)
+      var total = predictions.sum
+      if (total > 0) {predictions = predictions.map(x => x / total)}
+      else {predictions = ListBuffer(0.0,0.0,0.0,0.0)}
+
+      predictions
     }
 
     def find_active_nodes(): Unit = {
@@ -194,7 +250,7 @@ class cgp extends api.DefaultClassManager {
       }
       for (n <- node.incoming) {
         if (n.incoming.isEmpty == false) {
-          NU(n.number - this.num_input) = true
+          this.NU(n.number - this.num_input) = true
           new_find_path(n)
         }
       }
@@ -253,21 +309,9 @@ class cgp extends api.DefaultClassManager {
 
   /* Functions Class */
   class Functions {
-    def or(x:Int, y:Int): Int = {
-      return x | y
-    }
+    def add = (vals: List[Double]) => {vals.sum}
 
-    def and(x:Int, y:Int): Int = {
-      return x & y
-    }
-
-    def xor(x:Int, y:Int): Int = {
-      return x ^ y
-    }
-
-    def add = (vals: List[Int]) => {vals.sum}
-
-    val divide: List[Int] => Int = vals => {
+    val divide: List[Double] => Double = vals => {
       var result = vals(0)
       for (i <- 1 to vals.size-1) {
         if (vals(i) == 0) {
@@ -277,10 +321,10 @@ class cgp extends api.DefaultClassManager {
           result = result / vals(i)
         }
       }
-      result.toInt
+      result
     }
 
-    val subtract: List[Int] => Int = vals => {
+    val subtract: List[Double] => Double = vals => {
       var result = vals(0)
       for (i <- 1 to vals.size-1) {
         result = result - vals(i)
@@ -288,11 +332,7 @@ class cgp extends api.DefaultClassManager {
       result
     }
 
-    def multiply = (vals: List[Int]) => {vals.product}
-
-    def square(vals: List[Int]): List[Int] = {
-      return vals.map(x => x*x)
-    }
+    def multiply = (vals: List[Double]) => {vals.product}
 
   }
 
@@ -306,19 +346,22 @@ class cgp extends api.DefaultClassManager {
   var num_cgps_to_evaluate = 10
   var cgps = ListBuffer[Cgp]()
   var best_cgp_idx = -1
-  var lowest_cgp_metric_val: BigInt = 0
+  var lowest_cgp_metric_val: Double = 0
 
   var funcs = new Functions()
   var function_options = List(funcs.add, funcs.subtract, funcs.multiply, funcs.divide)
 
-  var sample_points = ListBuffer[Int]()
-  val true_values = ListBuffer[Int]()
+  var sample_points = ListBuffer[Double]()
+  var true_values = ListBuffer[Double]()
   // initialize because scala doesn't allow variable declaration without initialization
   var CGP_to_mutate = new Cgp(-1, num_output, lv_back, num_row, num_col, function_options)
 
+  var turtlesToCgps: mutable.Map[api.Turtle, Cgp] = mutable.LinkedHashMap[api.Turtle, Cgp]()
+
+
   // TODO: define true function to evaluate
   // TODO: hardcoded for now
-  def func(x: Int): Int = {
+  def func(x: Double): Double = {
     return (x * x) + 2*x + 1
   }
 
@@ -328,6 +371,64 @@ class cgp extends api.DefaultClassManager {
     manager.addPrimitive("true-value", get_true_values)
     manager.addPrimitive("init_cgp", init_cgp_eval)
     manager.addPrimitive("mutate_breed", mutate_breed)
+    manager.addPrimitive(name= "add-cgps", addCgp)
+    manager.addPrimitive(name = "get-cgp-list", getCgpList)
+    manager.addPrimitive(name="get-action", getAction)
+  }
+
+
+  object getAction extends api.Reporter {
+    override def getSyntax =
+      Syntax.reporterSyntax(right = List(Syntax.ListType),ret = Syntax.ListType, agentClassString = "-T--")
+    def report(args: Array[Argument], context: Context): AnyRef = {
+      var input_points_nlogo = args(0).getList.map( x => x.toString.toDouble).toList
+      var action_probs = turtlesToCgps(context.getAgent.asInstanceOf[api.Turtle]).solve_cgp(input_points_nlogo)
+      action_probs.toLogoList // stay, left, right
+    }
+  }
+
+
+  object addCgp extends api.Command {
+    override def getSyntax: Syntax = Syntax.commandSyntax(right = List(), agentClassString = "-T--")
+    override def perform(args: Array[Argument], context: Context): Unit = {
+      var net = new Cgp(9, 3, 2, 4, 4, function_options)
+      net.create_cgp()
+      net.find_active_nodes()
+      context.getAgent match {
+        case turtle: api.Turtle => turtlesToCgps.update(turtle, net)
+      }
+    }
+  }
+
+
+
+  object getCgpList extends api.Reporter {
+    override def getSyntax =
+      Syntax.reporterSyntax(ret = Syntax.ListType, agentClassString = "-T--")
+    def report(args: Array[Argument], context: Context): AnyRef = {
+      var cgp_layers = ListBuffer[ListBuffer[Int]]()
+      for (node <- turtlesToCgps(context.getAgent.asInstanceOf[api.Turtle]).node_list) {
+        var node_numbers = ListBuffer[Int]()
+        for (incoming_nodes <- node.incoming) {
+          node_numbers += incoming_nodes.number
+        }
+        cgp_layers += node_numbers
+      }
+      // [[], [0,0], []]
+
+      cgp_layers.toLogoList
+    }
+  }
+
+  // [ 1 [], 2 [1, 2], 3 [], []
+
+
+  override def clearAll(): Unit = {
+    super.clearAll()
+    sample_points = ListBuffer[Double]()
+    true_values = ListBuffer[Double]()
+
+    turtlesToCgps = mutable.LinkedHashMap[api.Turtle, Cgp]()
   }
 
   /* Overrides */
@@ -339,11 +440,12 @@ class cgp extends api.DefaultClassManager {
       var number_of_points = args(0).getIntValue
       val r = scala.util.Random
       for (i <- 1 to number_of_points) {
-        sample_points += r.nextInt(50)
+        sample_points += (-10 + (10 - -10) * r.nextDouble())
       }
       (sample_points).toLogoList
     }
   }
+
 
   // Evaluate true values
   object get_true_values extends api.Reporter {
@@ -368,10 +470,10 @@ class cgp extends api.DefaultClassManager {
 
         // squared difference
         var preds = CGP.decode_cgp(sample_points)
-        var diff = ListBuffer[BigInt]()
+        var diff = ListBuffer[Double]()
         for (i <- 0 to preds.length-1) diff += (true_values(i) - preds(i))
-        var diff_squared = ListBuffer[BigInt]()
-        for (i <- 0 to diff.length-1) diff_squared += diff(i).pow(2)
+        var diff_squared = ListBuffer[Double]()
+        for (i <- 0 to diff.length-1) diff_squared += (diff(i) * diff(i))
         CGP.evaluation_score = diff_squared.sum
         if (i == 0) {
           best_cgp_idx = i
@@ -423,13 +525,13 @@ class cgp extends api.DefaultClassManager {
         mutated_cgp.mutate_cgp(mutation_rate, true, true)
         var preds = mutated_cgp.decode_cgp(sample_points)
         // Evaluate predictions
-        var diff = ListBuffer[BigInt]()
+        var diff = ListBuffer[Double]()
         for (i <- 0 to preds.length - 1) {
           diff += (true_values(i) - preds(i))
         }
-        var diff_squared = ListBuffer[BigInt]()
+        var diff_squared = ListBuffer[Double]()
         for (i <- 0 to diff.length - 1) {
-          diff_squared += diff(i).pow(2)
+          diff_squared += (diff(i) * diff(i))
         }
         mutated_cgp.evaluation_score = diff_squared.sum
         if (mutated_cgp.evaluation_score < lowest_MSE) {
