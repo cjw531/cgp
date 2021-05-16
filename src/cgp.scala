@@ -222,10 +222,21 @@ class cgp extends api.DefaultClassManager {
       }
 
       // convert predictions so that they are probabilities that sum to 1
-      predictions = predictions.map(x => if (x < 0) x*0 else x)
-      var total = predictions.sum
-      if (total > 0) {predictions = predictions.map(x => x / total)}
-      else {predictions = ListBuffer(0.0,0.0,0.0,0.0)}
+//      predictions = predictions.map(x => if (x < 0) x*0 else x)
+//      var total = predictions.sum
+//      if (total > 0) {predictions = predictions.map(x => x / total)}
+//      else {predictions = ListBuffer(0.0,0.0,0.0)}
+
+      val g_index= predictions.indexOf(predictions.max)
+      if (g_index == 0) {
+        predictions = ListBuffer(1.0, 0.0, 0.0)
+      }
+      else if (g_index == 1) {
+        predictions = ListBuffer(0.0, 1.0, 0.0)
+      }
+      else {
+        predictions = ListBuffer(0.0, 0.0, 1.0)
+      }
 
       predictions
     }

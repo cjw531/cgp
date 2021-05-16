@@ -66,19 +66,34 @@ to go
   ;;;;;;;; tells us what action to take (move in what direction)
   ;; feed in cgp method info about observation
   ;;;;; input: []
-  ;;;;; output: [left-turn-prob, right-turn-prob, up-prob, down-prob]
+  ;;;;; output: [no-turn-prob, left-turn-prob, right-turn-prob]
   ;;;;; output_example: [0.5,    0.3,             0.2,     0.1]
   ;;;;; pick with those probabilities which action to take
 
   ask busses [
     let obs get-observations
-;    show obs
-    let result cgp:get-action obs
-    show result
+    let action-vector cgp:get-action obs
+    show action-vector
+    if action-vector = (list 1 0 0)
+    [
+      fd 1
+    ]
+    if action-vector = (list 0 1 0)
+    [
+      lt 20
+      fd 1
+    ]
+    if action-vector = (list 0 0 1)
+    [
+      rt 20
+      fd 1
+    ]
     ;; let probs cgp:get-action
     ;; takes action
+    eat
     reproduce
     check-death
+    set energy energy - 1
   ]
 
   ask inmates [
@@ -91,7 +106,20 @@ to go
   ]
 
   create-new-people
+
   tick
+end
+
+
+to eat
+  if any? inmates-here [
+    ask (one-of inmates-here) [die]
+    set energy energy + 20
+  ]
+  if any? officers-here [
+    ask (one-of officers-here) [die]
+    set energy energy - 20
+  ]
 end
 
 to draw-cone [degrees depth]
@@ -120,8 +148,23 @@ to draw-cones [offset depth degrees num]
   ]
 end
 
+to remove-cones [offset depth degrees num]
+  hatch 1 [
+    hide-turtle
+    set color gray + 1
+    lt offset
+    repeat num [
+      draw-cone degrees depth
+      rt degrees
+    ]
+    lt offset + degrees
+    die
+  ]
+end
+
+
 to-report get-observations
-  draw-cones (3 * 20 / 2 - 20 / 2) 5 20 3
+;  draw-cones (3 * 20 / 2 - 20 / 2) 5 20 3
 
   let obs []
   rt 20
