@@ -23,10 +23,7 @@ to setup
     cgp:add-cgps
   ]
 
-
-  let starting-inmates-number 10
-
-  repeat starting-inmates-number [
+  repeat 10 [
     ask one-of patches with [not any? inmates-here] [sprout-inmates 1 [
       set shape "person"
       set color orange
@@ -36,9 +33,7 @@ to setup
     ]
   ]
 
-  let starting-officers-number 5
-
-  repeat starting-officers-number [
+  repeat 5 [
     ask one-of patches with [not any? officers-here] [sprout-officers 1 [
       set shape "person"
       set color blue
@@ -62,29 +57,39 @@ end
 
 
 to go
-  ;; call cgp method
-  ;;;;;;;; tells us what action to take (move in what direction)
-  ;; feed in cgp method info about observation
-  ;;;;; input: []
-  ;;;;; output: [left-turn-prob, right-turn-prob, up-prob, down-prob]
-  ;;;;; output_example: [0.5,    0.3,             0.2,     0.1]
-  ;;;;; pick with those probabilities which action to take
-
   ask busses [
     let obs get-observations
-;    show obs
-    let result cgp:get-action obs
-    show result
-    ;; let probs cgp:get-action
-    ;; takes action
-    reproduce
+    let action-vector cgp:get-action obs
+    show action-vector
+    if action-vector = (list 0 0 0 )
+    [
+      let action one-of [1 2 3]
+      if action = 1 [fd 1]
+      if action = 2 [fd 2]
+      if action = 3 [fd 3]
+    ]
+    if action-vector = (list 1 0 0)
+    [
+      fd 1
+    ]
+    if action-vector = (list 0 1 0)
+    [
+      lt 20
+    ]
+    if action-vector = (list 0 0 1)
+    [
+      rt 20
+    ]
     check-death
+    set energy energy - 1
   ]
+  reproduce
 
   ask inmates [
     set age age + 1
     people-death
   ]
+
   ask officers [
     set age age + 1
     people-death
@@ -121,7 +126,7 @@ to draw-cones [offset depth degrees num]
 end
 
 to-report get-observations
-  draw-cones (3 * 20 / 2 - 20 / 2) 5 20 3
+  ;; draw-cones (3 * 20 / 2 - 20 / 2) 5 20 3
 
   let obs []
   rt 20
@@ -193,7 +198,24 @@ to move
 end
 
 to reproduce
-  ;; in here, mutate to generate an offspring
+  if ticks mod num-generation = 0 [ ;; in every num-generation tick
+    let parent nobody
+    ask busses [set parent max-one-of turtles [energy] ] ;; highest energy
+    if parent != nobody and random 100 < 50 [
+;      ask parent [
+        create-busses 1 [
+          setxy random-xcor random-ycor
+          set color orange
+          set shape "bus"
+          set size 2.5
+          set energy 100
+          set heading 90
+          cgp:mutate-reproduce parent 0.05 ;; mutation and reproduction rate, respectively
+
+;        ]
+      ]
+    ]
+  ]
 end
 
 to check-death
@@ -323,21 +345,21 @@ NIL
 1
 
 INPUTBOX
-18
-198
-141
-258
+702
+55
+825
+115
 num-generation
-10000.0
+10.0
 1
 0
 Number
 
 BUTTON
-711
-69
-779
-102
+761
+14
+829
+47
 NIL
 go
 T
@@ -362,10 +384,10 @@ mutation-rate
 Number
 
 BUTTON
-711
-13
-777
-46
+687
+14
+753
+47
 NIL
 setup
 NIL
@@ -379,10 +401,10 @@ NIL
 1
 
 BUTTON
-693
-156
-791
-189
+718
+129
+816
+162
 NIL
 print-cgps
 NIL
@@ -394,6 +416,35 @@ NIL
 NIL
 NIL
 1
+
+MONITOR
+707
+180
+809
+225
+NIL
+count busses
+17
+1
+11
+
+PLOT
+693
+249
+893
+399
+plot 1
+NIL
+NIL
+0.0
+10.0
+0.0
+10.0
+true
+false
+"" ""
+PENS
+"default" 1.0 0 -16777216 true "" "plot count inmates"
 
 @#$#@#$#@
 ## WHAT IS IT?

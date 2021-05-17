@@ -220,12 +220,56 @@ class cgp extends api.DefaultClassManager {
           predictions += NP(incoming_node.number - this.num_input)
         }
       }
+      import scala.math.abs
 
       // convert predictions so that they are probabilities that sum to 1
-      predictions = predictions.map(x => if (x < 0) x*0 else x)
+      predictions = predictions.map(x => scala.math.abs(x))
+
+//      return predictions
+
       var total = predictions.sum
-      if (total > 0) {predictions = predictions.map(x => x / total)}
-      else {predictions = ListBuffer(0.0,0.0,0.0,0.0)}
+
+      var g_index = 0
+      if (total > 0) {
+        predictions = predictions.map(x => x / total)
+        // weighted choice: https://softwareengineering.stackexchange.com/questions/150616/get-weighted-random-item
+
+        // Calculate the cumulative sums of the weights
+        var cum_sum = ListBuffer[Double]()
+        var ongoing_sum = 0.0
+        for (pred <- predictions) {
+          ongoing_sum = ongoing_sum + pred
+          cum_sum += ongoing_sum
+        }
+
+        // Generate a random number n in the range of 0 to sum(weights)
+        val r = scala.util.Random
+        var rand_num = r.nextDouble * predictions.sum
+
+        // Find the last item whose cumulative sum is above n
+        var idx = 0
+        for (i <- cum_sum) {
+          if (i > rand_num) {
+            g_index = idx
+          }
+          idx += 1
+        }
+      }
+      else {
+        predictions = ListBuffer(0.0,0.0,0.0)
+        return predictions
+      }
+
+//      val g_index= predictions.indexOf(predictions.max)
+      if (g_index == 0) {
+        predictions = ListBuffer(1.0, 0.0, 0.0)
+      }
+      else if (g_index == 1) {
+        predictions = ListBuffer(0.0, 1.0, 0.0)
+      }
+      else {
+        predictions = ListBuffer(0.0, 0.0, 1.0)
+      }
 
       predictions
     }
@@ -371,22 +415,54 @@ class cgp extends api.DefaultClassManager {
     manager.addPrimitive("true-value", get_true_values)
     manager.addPrimitive("init_cgp", init_cgp_eval)
     manager.addPrimitive("mutate_breed", mutate_breed)
-    manager.addPrimitive(name= "add-cgps", addCgp)
-    manager.addPrimitive(name = "get-cgp-list", getCgpList)
-    manager.addPrimitive(name="get-action", getAction)
+    manager.addPrimitive("add-cgps", addCgp)
+    manager.addPrimitive("get-cgp-list", getCgpList)
+    manager.addPrimitive("get-action", getAction)
+    manager.addPrimitive("mutate-reproduce", mutate_reproduce)
   }
 
 
+  object mutate_reproduce extends api.Command {
+    override def getSyntax: Syntax =
+      Syntax.commandSyntax(right = List(Syntax.AgentType, Syntax.NumberType), agentClassString = "-T--")
+    override def perform(args: Array[Argument], context: Context): Unit = {
+      CGP_to_mutate = turtlesToCgps(args(0).getAgent.asInstanceOf[api.Turtle]) // get cgp from parameter
+      var mutation_rate = args(1).getDoubleValue
+      // Make new CGP with same properties as parent
+      var mutated_cgp = new Cgp(9, 3, 2, 4, 4, function_options)
+      // Set nodes in node list
+      for (node <- CGP_to_mutate.node_list) {
+        var copied_node = new Node(node.func_idx, node.number, node.col_where)
+        mutated_cgp.add_to_node_list(copied_node)
+      }
+      // Set incoming and outgoing of nodes
+      for (node <- CGP_to_mutate.node_list) {
+        for (incoming_node <- node.incoming) {
+          mutated_cgp.node_list(node.number).add_in(mutated_cgp.node_list(incoming_node.number))
+        }
+        for (outgoing_node <- node.outgoing) {
+          mutated_cgp.node_list(node.number).add_out(mutated_cgp.node_list(outgoing_node.number))
+        }
+      }
+      // Mutate
+      mutated_cgp.mutate_cgp(mutation_rate, true, true)
+      mutated_cgp.find_active_nodes()
+
+      context.getAgent match {
+        case turtle: api.Turtle => turtlesToCgps.update(turtle, mutated_cgp)
+      }
+    }
+  }
+
   object getAction extends api.Reporter {
     override def getSyntax =
-      Syntax.reporterSyntax(right = List(Syntax.ListType),ret = Syntax.ListType, agentClassString = "-T--")
+      Syntax.reporterSyntax(right = List(Syntax.ListType), ret = Syntax.ListType, agentClassString = "-T--")
     def report(args: Array[Argument], context: Context): AnyRef = {
       var input_points_nlogo = args(0).getList.map( x => x.toString.toDouble).toList
       var action_probs = turtlesToCgps(context.getAgent.asInstanceOf[api.Turtle]).solve_cgp(input_points_nlogo)
       action_probs.toLogoList // stay, left, right
     }
   }
-
 
   object addCgp extends api.Command {
     override def getSyntax: Syntax = Syntax.commandSyntax(right = List(), agentClassString = "-T--")
@@ -399,8 +475,6 @@ class cgp extends api.DefaultClassManager {
       }
     }
   }
-
-
 
   object getCgpList extends api.Reporter {
     override def getSyntax =
