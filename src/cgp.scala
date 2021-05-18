@@ -353,7 +353,7 @@ class cgp extends api.DefaultClassManager {
 
   /* Functions Class */
   class Functions {
-    def add = (vals: List[Double]) => {vals.sum}
+    val add = (vals: List[Double]) => {vals.sum}
 
     val divide: List[Double] => Double = vals => {
       var result = vals(0)
@@ -376,7 +376,46 @@ class cgp extends api.DefaultClassManager {
       result
     }
 
-    def multiply = (vals: List[Double]) => {vals.product}
+    val multiply = (vals: List[Double]) => {vals.product}
+
+    val constant: List[Double] => Double = vals => {
+      val result = 1
+      result
+    }
+
+    val compare_1: List[Double] => Double = vals => {
+      var r = scala.util.Random
+      var a = vals(r.nextInt(vals.size))
+      var b = vals(r.nextInt(vals.size))
+      var result = 1
+      if (a < b) result = 1
+      else result = 0
+      result
+    }
+
+    val compare_2: List[Double] => Double = vals => {
+      var all_positive = true
+      for (v <- vals) {
+        if (v <= 0) all_positive = false
+      }
+
+      var result = 1
+      if (all_positive) result = 1
+      else result = 0
+      result
+    }
+
+    val compare_3: List[Double] => Double = vals => {
+      var any_positive = false
+      for (v <- vals) {
+        if (v > 0) any_positive = true
+      }
+
+      var result = 1
+      if (any_positive) result = 1
+      else result = 0
+      result
+    }
 
   }
 
@@ -393,7 +432,8 @@ class cgp extends api.DefaultClassManager {
   var lowest_cgp_metric_val: Double = 0
 
   var funcs = new Functions()
-  var function_options = List(funcs.add, funcs.subtract, funcs.multiply, funcs.divide)
+  var function_options = List(funcs.add, funcs.subtract, funcs.multiply, funcs.divide,
+    funcs.constant, funcs.compare_1, funcs.compare_2, funcs.compare_3)
 
   var sample_points = ListBuffer[Double]()
   var true_values = ListBuffer[Double]()
@@ -447,6 +487,7 @@ class cgp extends api.DefaultClassManager {
       // Mutate
       mutated_cgp.mutate_cgp(mutation_rate, true, true)
       mutated_cgp.find_active_nodes()
+//      mutated_cgp.sol
 
       context.getAgent match {
         case turtle: api.Turtle => turtlesToCgps.update(turtle, mutated_cgp)
