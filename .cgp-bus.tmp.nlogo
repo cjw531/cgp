@@ -205,7 +205,7 @@ to reproduce
     let parent one-of (busses with-max [energy])
 ;    ask busses [set parent max-one-of busses [energy] ] ;; highest energy
     if parent != nobody and random 100 < 50 [
-      repeat 2 [
+
         create-busses 1 [ ;; make 5 offspring
           setxy random-xcor random-ycor
           set color orange
@@ -214,7 +214,6 @@ to reproduce
           set energy 100
           set heading 90
           cgp:mutate-reproduce parent 0.05 ;; mutation and reproduction rate, respectively
-        ]
       ]
     ]
   ]
