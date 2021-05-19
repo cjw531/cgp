@@ -180,6 +180,7 @@ class cgp extends api.DefaultClassManager {
       var predictions = ListBuffer[Double]()
 
       // if no active nodes, then output maps to input and just return the point then
+      // output becomes their input b/c their active node array is all false
       if (!this.NU.contains(true)) {
         for (output_node <- (this.num_input + (this.num_row + this.num_col)) to (this.num_input + (this.num_row + this.num_col) + this.num_output - 1)) {
           for (incoming_node <- this.node_list(output_node).incoming) {
@@ -189,7 +190,7 @@ class cgp extends api.DefaultClassManager {
         return predictions
       }
 
-      var NP = ListBuffer[Double]()
+      var NP = ListBuffer[Double]() // values arr
       // Set all to 0 to begin with
       for (i <- 0 to this.NU.length-1) {
         NP += 0
@@ -200,20 +201,21 @@ class cgp extends api.DefaultClassManager {
           var node = this.node_list(cgp_node_idx + this.num_input) // offset so we can idx node in node_list
           var temp_vals = ListBuffer[Double]()
           for (incoming_node <- node.incoming) {
-            if (incoming_node.incoming.isEmpty) {
+            if (incoming_node.incoming.isEmpty) { // use input value
               temp_vals += inputs_list(incoming_node.number)
             }
-            else {
+            else { // get the list of incoming values
               temp_vals += NP(incoming_node.number - this.num_input)
             }
           }
-          NP(cgp_node_idx) = this.functions_options(node.func_idx)(temp_vals.toList)
+          NP(cgp_node_idx) = this.functions_options(node.func_idx)(temp_vals.toList) // applies function
         }
       }
 
+      // go thru all the outputs (each output has 1 incoming)
       for (output_node <- (this.num_input + (this.num_row * this.num_col)) to (this.num_input + (this.num_row * this.num_col) + this.num_output - 1)) {
         var incoming_node = this.node_list(output_node).incoming(0)
-        if (incoming_node.incoming.isEmpty) {
+        if (incoming_node.incoming.isEmpty) { // is this an input node?
           predictions += inputs_list(incoming_node.number)
         }
         else {
@@ -224,9 +226,6 @@ class cgp extends api.DefaultClassManager {
 
       // convert predictions so that they are probabilities that sum to 1
       predictions = predictions.map(x => scala.math.abs(x))
-
-//      return predictions
-
       var total = predictions.sum
 
       var g_index = 0
@@ -271,6 +270,7 @@ class cgp extends api.DefaultClassManager {
         predictions = ListBuffer(0.0, 0.0, 1.0)
       }
 
+      // TODO: raw probability data (before 1-0)
       predictions
     }
 
