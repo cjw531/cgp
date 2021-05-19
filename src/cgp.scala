@@ -231,28 +231,29 @@ class cgp extends api.DefaultClassManager {
       var g_index = 0
       if (total > 0) {
         predictions = predictions.map(x => x / total)
-        // weighted choice: https://softwareengineering.stackexchange.com/questions/150616/get-weighted-random-item
+        return predictions
+//        // weighted choice: https://softwareengineering.stackexchange.com/questions/150616/get-weighted-random-item
+//
+//        // Calculate the cumulative sums of the weights
+//        var cum_sum = ListBuffer[Double]()
+//        var ongoing_sum = 0.0
+//        for (pred <- predictions) {
+//          ongoing_sum = ongoing_sum + pred
+//          cum_sum += ongoing_sum
+//        }
 
-        // Calculate the cumulative sums of the weights
-        var cum_sum = ListBuffer[Double]()
-        var ongoing_sum = 0.0
-        for (pred <- predictions) {
-          ongoing_sum = ongoing_sum + pred
-          cum_sum += ongoing_sum
-        }
-
-        // Generate a random number n in the range of 0 to sum(weights)
-        val r = scala.util.Random
-        var rand_num = r.nextDouble * predictions.sum
-
-        // Find the last item whose cumulative sum is above n
-        var idx = 0
-        for (i <- cum_sum) {
-          if (i > rand_num) {
-            g_index = idx
-          }
-          idx += 1
-        }
+//        // Generate a random number n in the range of 0 to sum(weights)
+//        val r = scala.util.Random
+//        var rand_num = r.nextDouble * predictions.sum
+//
+//        // Find the last item whose cumulative sum is above n
+//        var idx = 0
+//        for (i <- cum_sum) {
+//          if (i > rand_num) {
+//            g_index = idx
+//          }
+//          idx += 1
+//        }
       }
       else {
         predictions = ListBuffer(0.0,0.0,0.0)
@@ -260,15 +261,15 @@ class cgp extends api.DefaultClassManager {
       }
 
 //      val g_index= predictions.indexOf(predictions.max)
-      if (g_index == 0) {
-        predictions = ListBuffer(1.0, 0.0, 0.0)
-      }
-      else if (g_index == 1) {
-        predictions = ListBuffer(0.0, 1.0, 0.0)
-      }
-      else {
-        predictions = ListBuffer(0.0, 0.0, 1.0)
-      }
+//      if (g_index == 0) {
+//        predictions = ListBuffer(1.0, 0.0, 0.0)
+//      }
+//      else if (g_index == 1) {
+//        predictions = ListBuffer(0.0, 1.0, 0.0)
+//      }
+//      else {
+//        predictions = ListBuffer(0.0, 0.0, 1.0)
+//      }
 
       // TODO: raw probability data (before 1-0)
       predictions
