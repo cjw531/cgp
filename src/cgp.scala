@@ -460,8 +460,18 @@ class cgp extends api.DefaultClassManager {
     manager.addPrimitive("get-cgp-list", getCgpList)
     manager.addPrimitive("get-action", getAction)
     manager.addPrimitive("mutate-reproduce", mutate_reproduce)
+    manager.addPrimitive("mutate-action", mutate_action)
   }
 
+  object mutate_action extends api.Command {
+    override def getSyntax: Syntax =
+      Syntax.commandSyntax(right = List(Syntax.NumberType, Syntax.NumberType), agentClassString = "-T--")
+    override def perform(args: Array[Argument], context: Context): Unit = {
+      var r = scala.util.Random
+      var coin_flip = r.nextFloat()
+      // TODO: mutate action vector?
+    }
+  }
 
   object mutate_reproduce extends api.Command {
     override def getSyntax: Syntax =

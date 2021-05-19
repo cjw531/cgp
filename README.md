@@ -10,9 +10,9 @@ sbt:cgp> package
 ```
 Note that warnings marked with `[warn]` is acceptable while `[errors]` are not. Resolving the error is the first step to do to generate `*.jar`. After executing both `compile` and `package` command, you should be able to see `[success]`.
 
-3. Launch NetLogo:
+3. Launch NetLogo (separate terminal):
 ```
-~NetLogo/$ sbt
+~NetLogo$ sbt
 sbt:root> netlogo/run
 ```
 and open `cgp.nlogo` inside `cgp/` folder.

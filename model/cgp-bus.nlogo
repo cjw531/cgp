@@ -1,6 +1,6 @@
 extensions [cgp]
 
-turtles-own [energy]
+turtles-own [energy action-vector is-first]
 inmates-own [age]
 officers-own [age]
 
@@ -13,17 +13,18 @@ to setup
   clear-all
   reset-ticks
 
-  create-busses 10 [
+  create-busses initial-num-busses [
     setxy random-xcor random-ycor
     set color orange
     set shape "bus"
     set size 2.5
     set energy 100
     set heading 90
+    set is-first true
     cgp:add-cgps
   ]
 
-  repeat 10 [
+  repeat initial-num-inmate [
     ask one-of patches with [not any? inmates-here] [sprout-inmates 1 [
       set shape "person"
       set color orange
@@ -33,7 +34,7 @@ to setup
     ]
   ]
 
-  repeat 5 [
+  repeat initial-num-officer [
     ask one-of patches with [not any? officers-here] [sprout-officers 1 [
       set shape "person"
       set color blue
@@ -58,28 +59,65 @@ end
 
 to go
   ask busses [
-    let obs get-observations
-    let action-vector cgp:get-action obs
-    show action-vector
-    if action-vector = (list 0 0 0 )
+    ;; if it is first run, need to initialize this
+    if is-first [
+      let obs get-observations
+      set action-vector cgp:get-action obs
+      show action-vector ;; raw probabilities
+    ]
+
+    ifelse action-vector = (list 0 0 0)
     [
       let action one-of [1 2 3]
       if action = 1 [fd 1]
-      if action = 2 [fd 2]
-      if action = 3 [fd 3]
+      if action = 2 [lt 20]
+      if action = 3 [rt 20]
     ]
-    if action-vector = (list 1 0 0)
     [
-      fd 1
+      ;; get cumulative sums
+      let cum-sum (list)
+      set cum-sum lput (item 0 action-vector) cum-sum
+      set cum-sum lput (item 0 action-vector + item 1 action-vector) cum-sum
+      set cum-sum lput (item 1 cum-sum + item 2 action-vector) cum-sum
+
+      let n random-float sum action-vector
+
+      (ifelse n < (item 0 cum-sum) [
+        ;; do first action
+        fd 1
+      ]
+      n < (item 1 cum-sum) [
+        ;; do second action
+        lt 20
+      ]
+      n < (item 2 cum-sum) [
+        ;; do third action
+        rt 20
+      ]
+      [
+        ;; else
+      ])
     ]
-    if action-vector = (list 0 1 0)
-    [
-      lt 20
-    ]
-    if action-vector = (list 0 0 1)
-    [
-      rt 20
-    ]
+
+;    if action-vector = (list 0 0 0 )
+;    [
+;      let action one-of [1 2 3]
+;      if action = 1 [fd 1]
+;      if action = 2 [lt 20]
+;      if action = 3 [rt 20]
+;    ]
+;    if action-vector = (list 1 0 0)
+;    [
+;      fd 1
+;    ]
+;    if action-vector = (list 0 1 0)
+;    [
+;      lt 20
+;    ]
+;    if action-vector = (list 0 0 1)
+;    [
+;      rt 20
+;    ]
     check-death
     set energy energy - 1
   ]
@@ -96,6 +134,9 @@ to go
   ]
 
   create-new-people
+
+  if not any? busses [ stop ]
+
   tick
 end
 
@@ -199,20 +240,23 @@ end
 
 to reproduce
   if ticks mod num-generation = 0 [ ;; in every num-generation tick
-    let parent nobody
-    ask busses [set parent max-one-of turtles [energy] ] ;; highest energy
+    let parent one-of (busses with-max [energy])
     if parent != nobody and random 100 < 50 [
-;      ask parent [
-        create-busses 1 [
+      repeat 2 [
+        create-busses 1 [ ;; make 5 offspring
           setxy random-xcor random-ycor
           set color orange
           set shape "bus"
           set size 2.5
           set energy 100
           set heading 90
-          cgp:mutate-reproduce parent 0.05 ;; mutation and reproduction rate, respectively
-
-;        ]
+          set is-first false
+          set action-vector [action-vector] of parent ;; inherited from parents
+          ;; TODO: mutate the action vector as well
+;          cgp:mutate-action action-vector [action-vector] of parent mutation-rate
+          ;; parent, mutation rate, and parent's action set, respectively
+          cgp:mutate-reproduce parent mutation-rate
+        ]
       ]
     ]
   ]
@@ -221,48 +265,15 @@ end
 to check-death
   if energy < 0 [die]
 end
-
-
-;;; current ideas
-;;;;;;;; mouse reproduce calls mutation which gives its offspring one of the mutated cgps
-;;;;;;;; mouse takes in list of inputs based on its observations and passes into cgp
-;;;;;;;; cgp black box returns a list of outputs and the mouse selects with prob which one to do
-
-to generate-point
-  clear-all
-  let points cgp:rand-point num-point
-  show points
-end
-
-to true-value
-  let values cgp:true-value
-  show values
-end
-
-to generate-cgp
-  let first-result cgp:init_cgp
-  show word "Best CGP #: " item 0 first-result
-  show word "Best evaluation score: " item 1 first-result
-end
-
-;to go
-;  let iter 0
-;  let eval-score 0
-;  while [iter < num-generation and eval-score > 100] [
-;    set iter iter + 1
-;    set eval-score cgp:mutate_breed mutation-rate
-;    show word "Score: " eval-score
-;  ]
-;end
 @#$#@#$#@
 GRAPHICS-WINDOW
-236
-10
-673
-448
+404
+15
+916
+528
 -1
 -1
-13.0
+15.3
 1
 10
 1
@@ -283,83 +294,10 @@ ticks
 30.0
 
 BUTTON
-108
-18
-223
-51
-NIL
-generate-point
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-INPUTBOX
-18
-16
-100
-91
-num-point
-100.0
-1
-0
-Number
-
-BUTTON
-108
-56
-224
-89
-NIL
-true-value
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-BUTTON
-126
-130
-224
-163
-NIL
-generate-cgp
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-INPUTBOX
-702
-55
-825
-115
-num-generation
-10.0
-1
-0
-Number
-
-BUTTON
-761
-14
-829
-47
+210
+213
+278
+246
 NIL
 go
 T
@@ -373,10 +311,10 @@ NIL
 1
 
 INPUTBOX
+251
 18
-119
-120
-179
+363
+78
 mutation-rate
 0.05
 1
@@ -384,10 +322,10 @@ mutation-rate
 Number
 
 BUTTON
-687
-14
-753
-47
+136
+213
+202
+246
 NIL
 setup
 NIL
@@ -400,40 +338,23 @@ NIL
 NIL
 1
 
-BUTTON
-718
-129
-816
-162
-NIL
-print-cgps
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
 MONITOR
-707
-180
-809
-225
-NIL
+227
+91
+281
+136
+busses
 count busses
 17
 1
 11
 
 PLOT
-693
-249
-893
-399
-plot 1
+64
+291
+336
+481
+Population
 NIL
 NIL
 0.0
@@ -441,10 +362,81 @@ NIL
 0.0
 10.0
 true
-false
+true
 "" ""
 PENS
-"default" 1.0 0 -16777216 true "" "plot count inmates"
+"busses" 1.0 0 -16777216 true "" "plot count inmates"
+
+MONITOR
+303
+90
+382
+135
+max energy
+max [energy] of busses
+17
+1
+11
+
+SLIDER
+33
+20
+205
+53
+initial-num-busses
+initial-num-busses
+1
+50
+10.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+34
+146
+206
+179
+num-generation
+num-generation
+1
+50
+50.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+33
+63
+205
+96
+initial-num-inmate
+initial-num-inmate
+1
+100
+5.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+32
+104
+204
+137
+initial-num-officer
+initial-num-officer
+0
+100
+5.0
+1
+1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
