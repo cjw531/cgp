@@ -60,26 +60,57 @@ to go
   ask busses [
     let obs get-observations
     let action-vector cgp:get-action obs
-    show action-vector
-    if action-vector = (list 0 0 0 )
+    show action-vector ;; raw probabilities
+
+
+    ifelse action-vector = (list 0 0 0)
     [
-      let action one-of [1 2 3]
-      if action = 1 [fd 1]
-      if action = 2 [lt 20]
-      if action = 3 [rt 20]
+
     ]
-    if action-vector = (list 1 0 0)
     [
-      fd 1
+      ;; get cumulative sums
+      let cum-sum (list)
+      set cum-sum lput (item 0 action-vector) cum-sum
+      set cum-sum lput (item 0 action-vector + item 1 action-vector) cum-sum
+      set cum-sum lput (item 1 cum-sum + item 2 action-vector) cum-sum
+
+      let n random-float sum action-vector
+
+
+      ifelse n < (item 0 cum-sum) [
+        ;; do first action
+      ]
+      n < (item 1 cum-sum) [
+        ;; do second action
+      ]
+      n < (item 2 cum-sum) [
+        ;; do third action
+      ]
+      [
+
+      ]
     ]
-    if action-vector = (list 0 1 0)
-    [
-      lt 20
-    ]
-    if action-vector = (list 0 0 1)
-    [
-      rt 20
-    ]
+
+
+;    if action-vector = (list 0 0 0 )
+;    [
+;      let action one-of [1 2 3]
+;      if action = 1 [fd 1]
+;      if action = 2 [lt 20]
+;      if action = 3 [rt 20]
+;    ]
+;    if action-vector = (list 1 0 0)
+;    [
+;      fd 1
+;    ]
+;    if action-vector = (list 0 1 0)
+;    [
+;      lt 20
+;    ]
+;    if action-vector = (list 0 0 1)
+;    [
+;      rt 20
+;    ]
     check-death
     set energy energy - 1
   ]
@@ -205,7 +236,7 @@ to reproduce
     let parent one-of (busses with-max [energy])
 ;    ask busses [set parent max-one-of busses [energy] ] ;; highest energy
     if parent != nobody and random 100 < 50 [
-
+      repeat 2 [
         create-busses 1 [ ;; make 5 offspring
           setxy random-xcor random-ycor
           set color orange
@@ -214,6 +245,7 @@ to reproduce
           set energy 100
           set heading 90
           cgp:mutate-reproduce parent 0.05 ;; mutation and reproduction rate, respectively
+        ]
       ]
     ]
   ]
