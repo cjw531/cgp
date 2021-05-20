@@ -182,7 +182,7 @@ class cgp extends api.DefaultClassManager {
       // if no active nodes, then output maps to input and just return the point then
       // output becomes their input b/c their active node array is all false
       if (!this.NU.contains(true)) {
-        for (output_node <- (this.num_input + (this.num_row + this.num_col)) to (this.num_input + (this.num_row + this.num_col) + this.num_output - 1)) {
+        for (output_node <- (this.num_input + (this.num_row * this.num_col)) to (this.num_input + (this.num_row * this.num_col) + this.num_output - 1)) {
           for (incoming_node <- this.node_list(output_node).incoming) {
             predictions += inputs_list(incoming_node.number)
           }

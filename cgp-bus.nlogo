@@ -1,5 +1,7 @@
 extensions [cgp]
 
+globals [generation]
+
 turtles-own [energy]
 inmates-own [age]
 officers-own [age]
@@ -15,11 +17,11 @@ to setup
 
   create-busses initial-num-busses [
     setxy random-xcor random-ycor
-    set color orange
-    set shape "bus"
-    set size 2.5
+    set color gray
+    set shape "my-mouse"
+    set size 2
     set energy 100
-    set heading 90
+;    set heading 90
     cgp:add-cgps
   ]
 
@@ -44,7 +46,7 @@ to setup
   ]
 
   ask patches [
-   set pcolor gray + 1
+   set pcolor black
   ]
 end
 
@@ -60,7 +62,7 @@ to go
   ask busses [
     let obs get-observations
     let action-vector cgp:get-action obs
-    show action-vector ;; raw probabilities
+;    show action-vector ;; raw probabilities
 
 
     ifelse action-vector = (list 0 0 0)
@@ -82,43 +84,27 @@ to go
 
       (ifelse n < (item 0 cum-sum) [
         ;; do first action
-        fd 1
+        fd 0.2
+        set energy energy - 1
       ]
       n < (item 1 cum-sum) [
         ;; do second action
         lt 20
+        set energy energy - 0.5
       ]
       n < (item 2 cum-sum) [
         ;; do third action
         rt 20
+        set energy energy - 0.5
       ]
       [
-        ;; else
+        ;; else should never come here
+          print "Should not be here"
       ])
     ]
-
-
-;    if action-vector = (list 0 0 0 )
-;    [
-;      let action one-of [1 2 3]
-;      if action = 1 [fd 1]
-;      if action = 2 [lt 20]
-;      if action = 3 [rt 20]
-;    ]
-;    if action-vector = (list 1 0 0)
-;    [
-;      fd 1
-;    ]
-;    if action-vector = (list 0 1 0)
-;    [
-;      lt 20
-;    ]
-;    if action-vector = (list 0 0 1)
-;    [
-;      rt 20
-;    ]
+    eat
     check-death
-    set energy energy - 1
+;    set energy energy - 1
   ]
   reproduce
 
@@ -137,6 +123,19 @@ to go
   if not any? busses [ stop ]
 
   tick
+end
+
+to eat
+  let food one-of inmates-here
+  if food != nobody [
+    ask food [die]
+    set energy energy + 10
+  ]
+  set food one-of officers-here
+  if food != nobody [
+    ask food [die]
+    set energy energy - 20
+  ]
 end
 
 to draw-cone [degrees depth]
@@ -209,7 +208,12 @@ end
 
 ;; Check if person should die
 to people-death
-  if age > 65 [die]
+  if breed = inmates [
+    if age > 200 [die]
+  ]
+  if breed = officers [
+    if age > 100 [die]
+  ]
 end
 
 to create-new-people
@@ -238,20 +242,43 @@ to move
 end
 
 to reproduce
-  if ticks mod num-generation = 0 [ ;; in every num-generation tick
-    let parent one-of (busses with-max [energy])
-;    ask busses [set parent max-one-of busses [energy] ] ;; highest energy
-    if parent != nobody and random 100 < 50 [
-      repeat 2 [
-        create-busses 1 [ ;; make 5 offspring
-          setxy random-xcor random-ycor
-          set color orange
-          set shape "bus"
-          set size 2.5
-          set energy 100
-          set heading 90
-          cgp:mutate-reproduce parent 0.05 ;; mutation and reproduction rate, respectively
+  if ticks != 0 [
+    if ticks mod num-generation = 0 [ ;; in every num-generation tick
+      set generation generation + 1
+
+      let parent one-of (busses with-max [energy])
+      let wild-card one-of (busses with [energy > (([energy] of parent) - 50)])
+      ;    ask busses [set parent max-one-of busses [energy] ] ;; highest energy
+      if parent != nobody [
+        ask busses with [(who != [who] of parent) and (who != [who] of wild-card)]
+        [
+          die
         ]
+        repeat (num-offspring - num-wild-card-offspring) [
+          create-busses 1 [ ;; make 5 offspring
+            setxy ([xcor] of parent) ([ycor] of parent)
+            set color gray
+            set shape "my-mouse"
+            set size 2
+            set energy 100
+            cgp:mutate-reproduce parent 0.05 ;; mutation and reproduction rate, respectively
+          ]
+        ]
+        ask parent [die]
+      ]
+      if wild-card != nobody [
+        ;; make offspring for wild card
+        repeat num-wild-card-offspring [
+          create-busses 1 [ ;; make 5 offspring
+            setxy ([xcor] of wild-card) ([ycor] of wild-card)
+            set color gray
+            set shape "my-mouse"
+            set size 2
+            set energy 100
+            cgp:mutate-reproduce wild-card 0.05 ;; mutation and reproduction rate, respectively
+          ]
+        ]
+        ask wild-card [die]
       ]
     ]
   ]
@@ -264,11 +291,11 @@ end
 GRAPHICS-WINDOW
 404
 15
-916
-528
+936
+548
 -1
 -1
-15.3
+15.9
 1
 10
 1
@@ -289,10 +316,10 @@ ticks
 30.0
 
 BUTTON
-210
-213
-278
-246
+124
+277
+192
+310
 NIL
 go
 T
@@ -317,10 +344,10 @@ mutation-rate
 Number
 
 BUTTON
-136
-213
-202
-246
+50
+277
+116
+310
 NIL
 setup
 NIL
@@ -345,10 +372,10 @@ count busses
 11
 
 PLOT
-64
-291
-336
-481
+61
+359
+333
+549
 Population
 NIL
 NIL
@@ -360,7 +387,7 @@ true
 true
 "" ""
 PENS
-"busses" 1.0 0 -16777216 true "" "plot count inmates"
+"busses" 1.0 0 -16777216 true "" "plot count busses"
 
 MONITOR
 303
@@ -382,7 +409,7 @@ initial-num-busses
 initial-num-busses
 1
 50
-9.0
+10.0
 1
 1
 NIL
@@ -395,10 +422,10 @@ SLIDER
 179
 num-generation
 num-generation
-1
-50
-50.0
-1
+100
+1000
+180.0
+20
 1
 NIL
 HORIZONTAL
@@ -412,7 +439,7 @@ initial-num-inmate
 initial-num-inmate
 1
 100
-5.0
+20.0
 1
 1
 NIL
@@ -427,7 +454,48 @@ initial-num-officer
 initial-num-officer
 0
 100
-5.0
+18.0
+1
+1
+NIL
+HORIZONTAL
+
+MONITOR
+264
+151
+344
+196
+generation
+generation
+17
+1
+11
+
+SLIDER
+17
+225
+228
+258
+num-wild-card-offspring
+num-wild-card-offspring
+1
+40
+2.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+34
+185
+206
+218
+num-offspring
+num-offspring
+0
+50
+6.0
 1
 1
 NIL
@@ -654,6 +722,15 @@ line half
 true
 0
 Line -7500403 true 150 0 150 150
+
+my-mouse
+true
+0
+Polygon -7500403 true true 210 75 165 15 135 15 90 75 90 90 75 120 75 135 90 150 120 150 135 135 135 120 135 105 135 135 120 150 90 150 75 135 75 165 75 195 90 225 105 240 120 255 135 255 135 270 150 285 165 285 195 285 210 270 195 270 165 270 150 270 150 255 165 255 210 225 225 195 225 135 210 150 180 150 180 105 225 105 225 135 225 105 210 75 165 15 135 15 90 75 90 90 75 120 75 135 90 150 120 150 135 135 135 105 75 105
+Polygon -7500403 true true 225 135 225 105 75 105 75 135
+Polygon -7500403 true true 210 75 180 15 135 15 75 105 225 105
+Polygon -7500403 true true 180 135 180 150 210 150 225 135 180 135
+Polygon -7500403 true true 120 150 90 150 75 135 135 135 120 150
 
 pentagon
 false
