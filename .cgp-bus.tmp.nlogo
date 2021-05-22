@@ -106,14 +106,13 @@ to go
       ]
       n < (item 2 cum-sum) [
         ;; do third action
+        rt 20
         ifelse color = red [
-          rt 10
-          set energy energy - 2.5
-        ]
+            set energy energy - 2.5
+          ]
         [
-          rt 20
-          set energy energy - 0.5
-        ]
+            set energy energy - 0.5
+]
       ]
       [
         ;; else should never come here
