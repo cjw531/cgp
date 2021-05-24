@@ -1,6 +1,8 @@
 extensions [cgp]
 
-turtles-own [energy]
+globals [generation]
+
+turtles-own [energy poisoned]
 inmates-own [age]
 officers-own [age]
 
@@ -13,17 +15,17 @@ to setup
   clear-all
   reset-ticks
 
-  create-busses 10 [
+  create-busses initial-num-busses [
     setxy random-xcor random-ycor
-    set color orange
-    set shape "bus"
-    set size 2.5
+    set color gray
+    set shape "my-mouse"
+    set size 2
     set energy 100
-    set heading 90
+;    set heading 90
     cgp:add-cgps
   ]
 
-  repeat 10 [
+  repeat initial-num-inmate [
     ask one-of patches with [not any? inmates-here] [sprout-inmates 1 [
       set shape "person"
       set color orange
@@ -33,7 +35,7 @@ to setup
     ]
   ]
 
-  repeat 5 [
+  repeat initial-num-officer [
     ask one-of patches with [not any? officers-here] [sprout-officers 1 [
       set shape "person"
       set color blue
@@ -44,7 +46,7 @@ to setup
   ]
 
   ask patches [
-   set pcolor gray + 1
+   set pcolor black
   ]
 end
 
@@ -60,30 +62,70 @@ to go
   ask busses [
     let obs get-observations
     let action-vector cgp:get-action obs
-    show action-vector
-    if action-vector = (list 0 0 0 )
+;    show action-vector ;; raw probabilities
+
+
+    ifelse action-vector = (list 0 0 0)
     [
       let action one-of [1 2 3]
       if action = 1 [fd 1]
-      if action = 2 [fd 2]
-      if action = 3 [fd 3]
+      if action = 2 [lt 20]
+      if action = 3 [rt 20]
     ]
-    if action-vector = (list 1 0 0)
     [
-      fd 1
+      ;; get cumulative sums
+      let cum-sum (list)
+      set cum-sum lput (item 0 action-vector) cum-sum
+      set cum-sum lput (item 0 action-vector + item 1 action-vector) cum-sum
+      set cum-sum lput (item 1 cum-sum + item 2 action-vector) cum-sum
+
+      let n random-float sum action-vector
+
+
+      (ifelse n < (item 0 cum-sum) [
+        ;; do first action
+        ifelse color = red [
+          fd 0.1
+          set energy energy - 5
+        ]
+        [
+          fd 0.2
+          set energy energy - 1
+        ]
+      ]
+      n < (item 1 cum-sum) [
+        ;; do second action
+        ifelse color = red [
+           lt 10
+           set energy energy - 2.5
+        ]
+        [
+           lt 20
+           set energy energy - 0.5
+        ]
+      ]
+      n < (item 2 cum-sum) [
+        ;; do third action
+        ifelse color = red [
+          rt 10
+          set energy energy - 2.5
+        ]
+        [
+          rt 20
+          set energy energy - 0.5
+        ]
+      ]
+      [
+        ;; else should never come here
+          print "Should not be here"
+      ])
     ]
-    if action-vector = (list 0 1 0)
-    [
-      lt 20
-    ]
-    if action-vector = (list 0 0 1)
-    [
-      rt 20
-    ]
+    handle-poison
+    eat
     check-death
-    set energy energy - 1
+    reproduce
+;    set energy energy - 1
   ]
-  reproduce
 
   ask inmates [
     set age age + 1
@@ -96,7 +138,42 @@ to go
   ]
 
   create-new-people
+
+  if not any? busses [ stop ]
+
   tick
+end
+
+
+to handle-poison
+  if color = red [
+   ifelse poisoned > 200 [
+     set poisoned 1
+     set color gray
+    ]
+   [
+     set poisoned poisoned + 1
+    ]
+  ]
+end
+
+to eat
+  let food one-of inmates-here
+  if food != nobody [
+    ask food [die]
+    ifelse color = red
+    [
+      set energy energy + 3
+      set poisoned 1
+    ]
+    [set energy energy + 10]
+  ]
+  set food one-of officers-here
+  if food != nobody [
+    ask food [die]
+    set color red
+    set energy energy - 20
+  ]
 end
 
 to draw-cone [degrees depth]
@@ -131,37 +208,37 @@ to-report get-observations
   let obs []
   rt 20
   repeat 3 [
-    set obs sentence obs (get-in-cone 5 20)
+    set obs sentence obs (get-in-cone 7 20)
     lt 20
   ]
   rt 40
-  set obs map [i -> i / 5] obs
+  set obs map [i -> i / 7] obs
   report obs
 end
 
 to-report get-in-cone [dist angle]
   let obs []
-  let cone other turtles in-cone 5 20
+  let cone other turtles in-cone 7 20
   let b min-one-of cone with [is-bus? self] [distance myself]
   if-else b = nobody [
     set obs lput 0 obs
   ]
   [
-    set obs lput (5 - ((distance b) / 2)) obs
+    set obs lput (7 - ((distance b) / 2)) obs
   ]
   let i min-one-of cone with [is-inmate? self] [distance myself]
   if-else i = nobody [
     set obs lput 0 obs
   ]
   [
-    set obs lput (5 - ((distance i) / 2)) obs
+    set obs lput (7 - ((distance i) / 2)) obs
   ]
    let o min-one-of cone with [is-officer? self] [distance myself]
   if-else o = nobody [
     set obs lput 0 obs
   ]
   [
-    set obs lput (5 - ((distance o) / 2)) obs
+    set obs lput (7 - ((distance o) / 2)) obs
   ]
 
   report obs
@@ -169,7 +246,12 @@ end
 
 ;; Check if person should die
 to people-death
-  if age > 65 [die]
+  if breed = inmates [
+    if age > 400 [die]
+  ]
+  if breed = officers [
+    if age > 100 [die]
+  ]
 end
 
 to create-new-people
@@ -198,71 +280,70 @@ to move
 end
 
 to reproduce
-  if ticks mod num-generation = 0 [ ;; in every num-generation tick
-    let parent nobody
-    ask busses [set parent max-one-of turtles [energy] ] ;; highest energy
-    if parent != nobody and random 100 < 50 [
-;      ask parent [
-        create-busses 1 [
-          setxy random-xcor random-ycor
-          set color orange
-          set shape "bus"
-          set size 2.5
-          set energy 100
-          set heading 90
-          cgp:mutate-reproduce parent 0.05 ;; mutation and reproduction rate, respectively
-
-;        ]
-      ]
-    ]
+  if random-float 100 < busses-reproduce and energy >= 80[  ; throw "dice" to see if you will reproduce
+    set energy (energy / 2)               ; divide energy between parent and offspring
+    hatch 1 [
+      rt random-float 360 fd 1
+      cgp:mutate-reproduce myself 0.05
+    ]  ; hatch an offspring and move it forward 1 step
   ]
 end
+
+;to reproduce
+;  if ticks != 0 [
+;    if ticks mod num-generation = 0 [ ;; in every num-generation tick
+;      set generation generation + 1
+;
+;      let parent one-of (busses with-max [energy])
+;      let wild-card one-of (busses with [energy > (([energy] of parent) - 50)])
+;      ;    ask busses [set parent max-one-of busses [energy] ] ;; highest energy
+;      if parent != nobody [
+;        ask busses with [(who != [who] of parent) and (who != [who] of wild-card)]
+;        [
+;          die
+;        ]
+;        repeat (num-offspring - num-wild-card-offspring) [
+;          create-busses 1 [ ;; make 5 offspring
+;            setxy ([xcor] of parent) ([ycor] of parent)
+;            set color gray
+;            set shape "my-mouse"
+;            set size 2
+;            set energy 100
+;            cgp:mutate-reproduce parent 0.05 ;; mutation and reproduction rate, respectively
+;          ]
+;        ]
+;        ask parent [die]
+;      ]
+;      if wild-card != nobody [
+;        ;; make offspring for wild card
+;        repeat num-wild-card-offspring [
+;          create-busses 1 [ ;; make 5 offspring
+;            setxy ([xcor] of wild-card) ([ycor] of wild-card)
+;            set color gray
+;            set shape "my-mouse"
+;            set size 2
+;            set energy 100
+;            cgp:mutate-reproduce wild-card 0.05 ;; mutation and reproduction rate, respectively
+;          ]
+;        ]
+;        ask wild-card [die]
+;      ]
+;    ]
+;  ]
+;end
 
 to check-death
   if energy < 0 [die]
 end
-
-
-;;; current ideas
-;;;;;;;; mouse reproduce calls mutation which gives its offspring one of the mutated cgps
-;;;;;;;; mouse takes in list of inputs based on its observations and passes into cgp
-;;;;;;;; cgp black box returns a list of outputs and the mouse selects with prob which one to do
-
-to generate-point
-  clear-all
-  let points cgp:rand-point num-point
-  show points
-end
-
-to true-value
-  let values cgp:true-value
-  show values
-end
-
-to generate-cgp
-  let first-result cgp:init_cgp
-  show word "Best CGP #: " item 0 first-result
-  show word "Best evaluation score: " item 1 first-result
-end
-
-;to go
-;  let iter 0
-;  let eval-score 0
-;  while [iter < num-generation and eval-score > 100] [
-;    set iter iter + 1
-;    set eval-score cgp:mutate_breed mutation-rate
-;    show word "Score: " eval-score
-;  ]
-;end
 @#$#@#$#@
 GRAPHICS-WINDOW
-236
+509
 10
-673
-448
+1041
+543
 -1
 -1
-13.0
+15.9
 1
 10
 1
@@ -283,83 +364,10 @@ ticks
 30.0
 
 BUTTON
-108
-18
-223
-51
-NIL
-generate-point
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-INPUTBOX
-18
-16
-100
-91
-num-point
-100.0
-1
-0
-Number
-
-BUTTON
-108
-56
-224
-89
-NIL
-true-value
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-BUTTON
-126
-130
-224
-163
-NIL
-generate-cgp
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-INPUTBOX
-702
-55
-825
-115
-num-generation
-10.0
-1
-0
-Number
-
-BUTTON
-761
-14
-829
-47
+124
+277
+192
+310
 NIL
 go
 T
@@ -373,10 +381,10 @@ NIL
 1
 
 INPUTBOX
-18
-119
-120
-179
+217
+19
+306
+79
 mutation-rate
 0.05
 1
@@ -384,10 +392,10 @@ mutation-rate
 Number
 
 BUTTON
-687
-14
-753
-47
+50
+277
+116
+310
 NIL
 setup
 NIL
@@ -400,40 +408,23 @@ NIL
 NIL
 1
 
-BUTTON
-718
-129
-816
-162
-NIL
-print-cgps
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
 MONITOR
-707
-180
-809
-225
-NIL
+276
+196
+330
+241
+busses
 count busses
 17
 1
 11
 
 PLOT
-693
-249
-893
-399
-plot 1
+42
+334
+481
+600
+Population
 NIL
 NIL
 0.0
@@ -441,10 +432,137 @@ NIL
 0.0
 10.0
 true
-false
+true
 "" ""
 PENS
-"default" 1.0 0 -16777216 true "" "plot count inmates"
+"busses" 1.0 0 -16777216 true "" "plot count busses"
+
+MONITOR
+352
+195
+431
+240
+max energy
+max [energy] of busses
+17
+1
+11
+
+SLIDER
+33
+20
+205
+53
+initial-num-busses
+initial-num-busses
+1
+50
+10.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+34
+146
+206
+179
+num-generation
+num-generation
+100
+1000
+220.0
+20
+1
+NIL
+HORIZONTAL
+
+SLIDER
+33
+63
+205
+96
+initial-num-inmate
+initial-num-inmate
+1
+100
+20.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+32
+104
+204
+137
+initial-num-officer
+initial-num-officer
+0
+100
+18.0
+1
+1
+NIL
+HORIZONTAL
+
+MONITOR
+304
+257
+405
+318
+generation
+generation
+17
+1
+15
+
+SLIDER
+17
+225
+228
+258
+num-wild-card-offspring
+num-wild-card-offspring
+1
+40
+2.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+34
+185
+206
+218
+num-offspring
+num-offspring
+0
+50
+6.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+261
+252
+433
+285
+busses-reproduce
+busses-reproduce
+0
+100
+5.0
+1
+1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
@@ -667,6 +785,15 @@ line half
 true
 0
 Line -7500403 true 150 0 150 150
+
+my-mouse
+true
+0
+Polygon -7500403 true true 210 75 165 15 135 15 90 75 90 90 75 120 75 135 90 150 120 150 135 135 135 120 135 105 135 135 120 150 90 150 75 135 75 165 75 195 90 225 105 240 120 255 135 255 135 270 150 285 165 285 195 285 210 270 195 270 165 270 150 270 150 255 165 255 210 225 225 195 225 135 210 150 180 150 180 105 225 105 225 135 225 105 210 75 165 15 135 15 90 75 90 90 75 120 75 135 90 150 120 150 135 135 135 105 75 105
+Polygon -7500403 true true 225 135 225 105 75 105 75 135
+Polygon -7500403 true true 210 75 180 15 135 15 75 105 225 105
+Polygon -7500403 true true 180 135 180 150 210 150 225 135 180 135
+Polygon -7500403 true true 120 150 90 150 75 135 135 135 120 150
 
 pentagon
 false
