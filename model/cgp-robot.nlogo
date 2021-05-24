@@ -2,71 +2,93 @@ extensions [cgp]
 
 globals [generation]
 
-turtles-own [energy poisoned]
-inmates-own [age]
-officers-own [age]
+turtles-own [energy] ; poisoned removed
+package-own [age]
+charger-own [age]
 
-breed [busses bus]
-breed [inmates inmate]
-breed [officers officer]
-
+breed [robot a-robot]
+breed [package a-package]
+breed [charger a-charger]
 
 to setup
   clear-all
   reset-ticks
 
-  create-busses initial-num-busses [
-    setxy random-xcor random-ycor
-    set color gray
-    set shape "my-mouse"
-    set size 2
-    set energy 100
-;    set heading 90
-    cgp:add-cgps
-  ]
-
-  repeat initial-num-inmate [
-    ask one-of patches with [not any? inmates-here] [sprout-inmates 1 [
-      set shape "person"
-      set color orange
-      set size 1.5
-      set age 1
+  ;; create robots
+  repeat initial-num-robot [
+    ask one-of patches with [not any? turtles-here
+      and (pxcor != max-pxcor and pxcor != min-pxcor and pycor != max-pycor and pycor != min-pycor)] [
+      sprout-robot 1 [
+        set shape "emblem"
+        set size 2
+        set energy 100
+        set heading 0
+        rt (random 360)
+        set color green
+        cgp:add-cgps
       ]
     ]
   ]
 
-  repeat initial-num-officer [
-    ask one-of patches with [not any? officers-here] [sprout-officers 1 [
-      set shape "person"
-      set color blue
-      set size 1.5
-      set age 1
+  ;; create packages
+  repeat initial-num-package [
+    ask one-of patches with [not any? turtles-here and (pxcor >= 12) and (pxcor < 24)
+      and (pxcor != max-pxcor and pxcor != min-pxcor and pycor != max-pycor and pycor != min-pycor)] [
+      sprout-package 1 [
+        set shape "box"
+        set color brown
+        set size 1.5
+        set age 1
       ]
     ]
   ]
 
+  ;; create charging stations
+  repeat initial-num-charger [
+    ask one-of patches with [not any? turtles-here and (pxcor > -14) and (pxcor < 12)
+      and (pxcor != max-pxcor and pxcor != min-pxcor and pycor != max-pycor and pycor != min-pycor)] [
+      sprout-charger 1 [
+        set shape "building store"
+        set color blue
+        set size 1.5
+        set age 1
+      ]
+    ]
+  ]
+
+  ;; background color
   ask patches [
-   set pcolor black
+   set pcolor gray + 1
   ]
-end
 
-to print-cgps
-  ask busses[
-    let cgps cgp:get-cgp-list
-    show cgps
+  ;; set destination color
+  ask patches with [(pxcor >= -24) and (pxcor < -14)] [
+    set pcolor 118
   ]
-end
 
+  ;; set package zone color
+  ask patches with [(pxcor >= 12) and (pxcor < 24)] [
+    set pcolor 108
+  ]
+
+  ;; set wall
+  ask patches with [
+    pxcor = max-pxcor or
+    pxcor = min-pxcor or
+    pycor = max-pycor or
+    pycor = min-pycor ] [
+    set pcolor red
+  ]
+
+end
 
 to go
-  ask busses [
+  ask robot [
     let obs get-observations
     let action-vector cgp:get-action obs
-;    show action-vector ;; raw probabilities
+;    show action-vector ;; testing purpose
 
-
-    ifelse action-vector = (list 0 0 0)
-    [
+    ifelse action-vector = (list 0 0 0) [
       let action one-of [1 2 3]
       if action = 1 [fd 1]
       if action = 2 [lt 20]
@@ -81,130 +103,76 @@ to go
 
       let n random-float sum action-vector
 
-
       (ifelse n < (item 0 cum-sum) [
         ;; do first action
-        ifelse color = red [
-          fd 0.1
-          set energy energy - 5
-        ]
-        [
-          fd 0.2
-          set energy energy - 1
-        ]
+        fd 0.2
+        set energy energy - 1
       ]
       n < (item 1 cum-sum) [
         ;; do second action
-        ifelse color = red [
-           lt 10
-           set energy energy - 2.5
-        ]
-        [
-           lt 20
-           set energy energy - 0.5
-        ]
+        lt 20
+        set energy energy - 0.5
       ]
       n < (item 2 cum-sum) [
         ;; do third action
-        ifelse color = red [
-          rt 10
-          set energy energy - 2.5
-        ]
-        [
-          rt 20
-          set energy energy - 0.5
-        ]
+        rt 20
+        set energy energy - 0.5
       ]
       [
         ;; else should never come here
           print "Should not be here"
       ])
     ]
-    handle-poison
-    eat
+
+    pickup-dropoff
     check-death
     reproduce
-;    set energy energy - 1
   ]
 
-  ask inmates [
+  ask package [
     set age age + 1
-    people-death
+    if age > 400 [die]
   ]
 
-  ask officers [
+  ask charger [
     set age age + 1
-    people-death
+    if age > 100 [die]
   ]
 
-  create-new-people
-
-  if not any? busses [ stop ]
-
+  create-new-items
+  if not any? robot [ stop ]
   tick
 end
 
-
-to handle-poison
-  if color = red [
-   ifelse poisoned > 200 [
-     set poisoned 1
-     set color gray
-    ]
-   [
-     set poisoned poisoned + 1
-    ]
+to pickup-dropoff
+  let pick one-of package-here ;; check for pick-up
+  if pick != nobody and color != orange [
+    ask pick [die]
+    set energy energy + 10
+    set color orange
   ]
-end
 
-to eat
-  let food one-of inmates-here
-  if food != nobody [
-    ask food [die]
-    ifelse color = red
-    [
-      set energy energy + 3
-      set poisoned 1
-    ]
-    [set energy energy + 10]
+  let destination patch-here ;; check if it is on drop-off area
+  if destination != nobody and pcolor = 118 and color = orange [
+    set energy energy + 10
+    set color green
   ]
-  set food one-of officers-here
-  if food != nobody [
-    ask food [die]
-    set color red
-    set energy energy - 20
-  ]
-end
 
-to draw-cone [degrees depth]
-  rt degrees / 2.0
-  pd
-  fd depth
-  lt 180 - ((180 - degrees) / 2.0)
-  fd sqrt (2 * depth ^ 2 * (1 - cos degrees))
-  lt 180 - ((180 - degrees) / 2.0)
-  fd depth
-  lt 180 - (degrees / 2.0)
-  pu
-end
-
-to draw-cones [offset depth degrees num]
-  hatch 1 [
-    hide-turtle
-    set color white
-    lt offset
-    repeat num [
-      draw-cone degrees depth
-      rt degrees
-    ]
-    lt offset + degrees
-    die
+  let wall patch-here ;; check whether the robot is in wall
+  if wall != nobody and pcolor = red [
+    set energy energy - 3
+    rt 180
   ]
+
+  let charging one-of charger-here ;; recharge the robot
+  if charging != nobody [
+    set energy 100
+  ]
+  ;; hold while charging:
+  ;; https://stackoverflow.com/questions/59470217/how-to-make-agent-stay-at-certain-patch-in-netlogo-within-certain-ticks
 end
 
 to-report get-observations
-  ;; draw-cones (3 * 20 / 2 - 20 / 2) 5 20 3
-
   let obs []
   rt 20
   repeat 3 [
@@ -213,80 +181,75 @@ to-report get-observations
   ]
   rt 40
   set obs map [i -> i / 7] obs
+
   report obs
 end
 
 to-report get-in-cone [dist angle]
   let obs []
   let cone other turtles in-cone 7 20
-  let b min-one-of cone with [is-bus? self] [distance myself]
-  if-else b = nobody [
-    set obs lput 0 obs
-  ]
-  [
-    set obs lput (7 - ((distance b) / 2)) obs
-  ]
-  let i min-one-of cone with [is-inmate? self] [distance myself]
-  if-else i = nobody [
-    set obs lput 0 obs
-  ]
-  [
-    set obs lput (7 - ((distance i) / 2)) obs
-  ]
-   let o min-one-of cone with [is-officer? self] [distance myself]
-  if-else o = nobody [
-    set obs lput 0 obs
-  ]
-  [
-    set obs lput (7 - ((distance o) / 2)) obs
-  ]
+  let front-patches patches in-cone 7 20
+
+  let r min-one-of cone with [is-a-robot? self] [distance myself]
+  if-else r = nobody [ set obs lput 0 obs ]
+  [ set obs lput (7 - ((distance r) / 2)) obs ]
+
+  let p min-one-of cone with [is-a-package? self] [distance myself]
+  if-else p = nobody [ set obs lput 0 obs ]
+  [ set obs lput (7 - ((distance p) / 2)) obs ]
+
+  let c min-one-of cone with [is-a-charger? self] [distance myself]
+  if-else c = nobody [ set obs lput 0 obs ]
+  [ set obs lput (7 - ((distance c) / 2)) obs ]
+
+  let w min-one-of front-patches with [pcolor = red] [distance myself]
+  if-else w = nobody [ set obs lput 0 obs ]
+  [ set obs lput (7 - ((distance w) / 2)) obs ]
+
+  let d min-one-of front-patches with [pcolor = 118] [distance myself]
+  if-else d = nobody [ set obs lput 0 obs ]
+  [ set obs lput (7 - ((distance d) / 2)) obs ]
 
   report obs
 end
 
-;; Check if person should die
-to people-death
-  if breed = inmates [
-    if age > 400 [die]
-  ]
-  if breed = officers [
-    if age > 100 [die]
-  ]
-end
-
-to create-new-people
+to create-new-items
   if random 100 < 10 [
-    ask one-of patches with [not any? inmates-here] [sprout-inmates 1 [
-      set shape "person"
-      set color orange
-      set size 1.5
-      set age 1
+    ask one-of patches with [not any? turtles-here and (pxcor >= 12) and (pxcor < 24)
+      and (pxcor != max-pxcor and pxcor != min-pxcor and pycor != max-pycor and pycor != min-pycor)] [
+      sprout-package 1 [
+        set shape "box"
+        set color brown
+        set size 1.5
+        set age 1
       ]
     ]
   ]
   if random 100 < 5 [
-    ask one-of patches with [not any? officers-here] [sprout-officers 1 [
-      set shape "person"
-      set color blue
-      set size 1.5
-      set age 1
+    ask one-of patches with [not any? turtles-here and (pxcor > -14) and (pxcor < 12)
+      and (pxcor != max-pxcor and pxcor != min-pxcor and pycor != max-pycor and pycor != min-pycor)] [
+      sprout-charger 1 [
+        set shape "building store"
+        set color blue
+        set size 1.5
+        set age 1
       ]
     ]
   ]
 end
 
-to move
-  fd 1
-end
-
 to reproduce
-  if random-float 100 < busses-reproduce and energy >= 80[  ; throw "dice" to see if you will reproduce
+  if random-float 100 < num-reproduce and energy >= 80[  ; throw "dice" to see if you will reproduce
     set energy (energy / 2)               ; divide energy between parent and offspring
     hatch 1 [
       rt random-float 360 fd 1
       cgp:mutate-reproduce myself 0.05
     ]  ; hatch an offspring and move it forward 1 step
   ]
+end
+
+to check-death
+  if energy < 0 [die]
 end
 
 ;to reproduce
@@ -332,14 +295,43 @@ end
 ;  ]
 ;end
 
-to check-death
-  if energy < 0 [die]
+to print-cgps ;; testing purpose
+  ask robot [
+    let cgps cgp:get-cgp-list
+    show cgps
+  ]
+end
+
+to draw-cone [degrees depth]
+  rt degrees / 2.0
+  pd
+  fd depth
+  lt 180 - ((180 - degrees) / 2.0)
+  fd sqrt (2 * depth ^ 2 * (1 - cos degrees))
+  lt 180 - ((180 - degrees) / 2.0)
+  fd depth
+  lt 180 - (degrees / 2.0)
+  pu
+end
+
+to draw-cones [offset depth degrees num]
+  hatch 1 [
+    hide-turtle
+    set color white
+    lt offset
+    repeat num [
+      draw-cone degrees depth
+      rt degrees
+    ]
+    lt offset + degrees
+    die
+  ]
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
 509
 10
-1041
+1296
 543
 -1
 -1
@@ -350,11 +342,11 @@ GRAPHICS-WINDOW
 1
 1
 0
+0
+0
 1
-1
-1
--16
-16
+-24
+24
 -16
 16
 1
@@ -364,10 +356,10 @@ ticks
 30.0
 
 BUTTON
-124
-277
-192
-310
+120
+226
+188
+259
 NIL
 go
 T
@@ -381,10 +373,10 @@ NIL
 1
 
 INPUTBOX
-217
-19
-306
-79
+261
+192
+350
+252
 mutation-rate
 0.05
 1
@@ -392,10 +384,10 @@ mutation-rate
 Number
 
 BUTTON
-50
-277
-116
-310
+46
+226
+112
+259
 NIL
 setup
 NIL
@@ -409,22 +401,22 @@ NIL
 1
 
 MONITOR
-276
-196
-330
-241
-busses
-count busses
+34
+156
+91
+201
+Robot
+count robot
 17
 1
 11
 
 PLOT
-42
-334
-481
-600
-Population
+40
+282
+479
+548
+Population of Robot
 NIL
 NIL
 0.0
@@ -435,15 +427,15 @@ true
 true
 "" ""
 PENS
-"busses" 1.0 0 -16777216 true "" "plot count busses"
+"busses" 1.0 0 -16777216 true "" "plot count robot"
 
 MONITOR
-352
-195
-431
-240
+110
+155
+189
+200
 max energy
-max [energy] of busses
+max [energy] of robot
 17
 1
 11
@@ -453,21 +445,21 @@ SLIDER
 20
 205
 53
-initial-num-busses
-initial-num-busses
+initial-num-robot
+initial-num-robot
 1
 50
-10.0
+30.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-34
-146
-206
-179
+289
+26
+461
+59
 num-generation
 num-generation
 100
@@ -481,10 +473,10 @@ HORIZONTAL
 SLIDER
 33
 63
-205
+213
 96
-initial-num-inmate
-initial-num-inmate
+initial-num-package
+initial-num-package
 1
 100
 20.0
@@ -496,23 +488,23 @@ HORIZONTAL
 SLIDER
 32
 104
-204
+217
 137
-initial-num-officer
-initial-num-officer
+initial-num-charger
+initial-num-charger
 0
-100
-18.0
+5
+3.0
 1
 1
 NIL
 HORIZONTAL
 
 MONITOR
-304
-257
-405
-318
+364
+192
+465
+253
 generation
 generation
 17
@@ -520,10 +512,10 @@ generation
 15
 
 SLIDER
-17
-225
-228
-258
+272
+105
+483
+138
 num-wild-card-offspring
 num-wild-card-offspring
 1
@@ -535,27 +527,27 @@ NIL
 HORIZONTAL
 
 SLIDER
-34
-185
-206
-218
+289
+65
+461
+98
 num-offspring
 num-offspring
 0
 50
-6.0
+7.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-261
-252
-433
-285
-busses-reproduce
-busses-reproduce
+278
+145
+450
+178
+num-reproduce
+num-reproduce
 0
 100
 5.0
@@ -635,6 +627,21 @@ Circle -7500403 true true 110 75 80
 Line -7500403 true 150 100 80 30
 Line -7500403 true 150 100 220 30
 
+building store
+false
+0
+Rectangle -7500403 true true 30 45 45 240
+Rectangle -16777216 false false 30 45 45 165
+Rectangle -7500403 true true 15 165 285 255
+Rectangle -16777216 true false 120 195 180 255
+Line -7500403 true 150 195 150 255
+Rectangle -16777216 true false 30 180 105 240
+Rectangle -16777216 true false 195 180 270 240
+Line -16777216 false 0 165 300 165
+Polygon -7500403 true true 0 165 45 135 60 90 240 90 255 135 300 165
+Rectangle -7500403 true true 0 0 75 45
+Rectangle -16777216 false false 0 0 75 45
+
 bus
 false
 0
@@ -703,6 +710,15 @@ dot
 false
 0
 Circle -7500403 true true 90 90 120
+
+emblem
+true
+0
+Polygon -7500403 true true 300 210 285 180 15 180 0 210
+Polygon -7500403 true true 270 165 255 135 45 135 30 165
+Polygon -7500403 true true 240 120 225 90 75 90 60 120
+Polygon -7500403 true true 150 15 285 255 15 255
+Polygon -16777216 true false 225 225 150 90 75 225
 
 face happy
 false
