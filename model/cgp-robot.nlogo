@@ -14,9 +14,9 @@
 
 extensions [cgp]
 
-globals [generation]
+globals [generation count-pickup count-dropoff]
 
-turtles-own [battery action-reward charging-tick is-charging]
+turtles-own [battery action-reward fitness charging-tick is-charging]
 package-own [age]
 charger-own [age]
 
@@ -27,6 +27,10 @@ breed [charger a-charger]
 to setup
   clear-all
   reset-ticks
+
+  set count-pickup 0
+  set count-dropoff 0
+  set generation 1
 
   ;; create robots
   repeat initial-num-robot [
@@ -40,6 +44,7 @@ to setup
         rt (random 360)
         set color green
         set charging-tick 0
+        set fitness 0
         cgp:add-cgps
       ]
     ]
@@ -99,15 +104,11 @@ end
 
 to go
   ask robot [
-    show battery
-    show action-reward
-
     let tick-check charging-tick
     (ifelse tick-check = 0 [
       observation-to-action ;; put observation of each robot to cgp and solve the cgp
-      pickup-dropoff ;; check for their task performance
-      check-death ;; check whether the robot should die or not
-      reproduce ;; reproduce
+      if battery < 0 [die] ;; check whether the robot should die or not
+      action-score ;; check for their task performance
     ] charging-tick = 1 [ ;; charging on hold but move out robot
       fd 1.5 ;; send robot out of charging station
       set charging-tick charging-tick - 1 ;; make it 0
@@ -120,11 +121,12 @@ to go
     if age > 400 [die]
   ]
 
-;  ask charger [
-;    set age age + 1
-;    if age > 100 [die]
-;  ]
+  ask charger [
+    set age age + 1
+    if age > 100 [die]
+  ]
 
+  reproduce ;; reproduce
   create-new-items
   if not any? robot [ stop ]
   tick
@@ -175,23 +177,31 @@ to observation-to-action
     ]
 end
 
-to pickup-dropoff
+to action-score
   let pick one-of package-here ;; check for pick-up
-  if pick != nobody and color != orange [
-    ask pick [die]
-    set action-reward action-reward + 10
-    set color orange
+  if pick != nobody [
+    ifelse color != orange [ ;; reward for pick up
+      ask pick [die]
+      set action-reward action-reward + 20
+      set color orange
+      set count-pickup count-pickup + 1
+    ]
+    [ set action-reward action-reward - 5 ] ;; penalize if they try to hold 2 packages
   ]
 
   let destination patch-here ;; check if it is on drop-off area
-  if destination != nobody and pcolor = 118 and color = orange [
-    set action-reward action-reward + 10
-    set color green
+  if destination != nobody and pcolor = 118 [
+    ifelse color = orange [ ;; reward for delivering
+      set action-reward action-reward + 30
+      set color green
+      set count-dropoff count-dropoff + 1
+    ]
+    [ set action-reward action-reward - 10 ] ;; penalize for staying here w/o item
   ]
 
   let wall patch-here ;; check whether the robot is in wall
   if wall != nobody and pcolor = red [ ;; if bumped
-    set action-reward action-reward - 5
+    set action-reward action-reward - 10
     rt 180 ;; turn around
     fd 1 ;; move off from the wall
   ]
@@ -200,6 +210,7 @@ to pickup-dropoff
   if charging != nobody and charging-tick = 0 [
     set charging-tick ceiling (tick-per-generation * 0.05) + 1 ;; hold for 5% time of each generation
     set battery 100
+    set action-reward action-reward + 5
   ]
 end
 
@@ -275,62 +286,51 @@ end
 
 ;;; Is this directed reproduction? Or does it just happen to do this because of battery? Where is the fitness measured?
 
-to reproduce
-  if random-float 100 < num-reproduce and battery >= 80 [  ; throw "dice" to see if you will reproduce
-    set battery (battery / 2)               ; divide battery between parent and offspring
-    hatch 1 [
-      rt random-float 360 fd 1
-      cgp:mutate-reproduce myself 0.05
-    ]  ; hatch an offspring and move it forward 1 step
-  ]
-end
-
-to check-death
-  if battery < 0 [die]
-end
-
 ;to reproduce
-;  if ticks != 0 [
-;    if ticks mod num-generation = 0 [ ;; in every num-generation tick
-;      set generation generation + 1
-;
-;      let parent one-of (busses with-max [battery])
-;      let wild-card one-of (busses with [battery > (([battery] of parent) - 50)])
-;      ;    ask busses [set parent max-one-of busses [battery] ] ;; highest battery
-;      if parent != nobody [
-;        ask busses with [(who != [who] of parent) and (who != [who] of wild-card)]
-;        [
-;          die
-;        ]
-;        repeat (num-offspring - num-wild-card-offspring) [
-;          create-busses 1 [ ;; make 5 offspring
-;            setxy ([xcor] of parent) ([ycor] of parent)
-;            set color gray
-;            set shape "my-mouse"
-;            set size 2
-;            set battery 100
-;            cgp:mutate-reproduce parent 0.05 ;; mutation and reproduction rate, respectively
-;          ]
-;        ]
-;        ask parent [die]
-;      ]
-;      if wild-card != nobody [
-;        ;; make offspring for wild card
-;        repeat num-wild-card-offspring [
-;          create-busses 1 [ ;; make 5 offspring
-;            setxy ([xcor] of wild-card) ([ycor] of wild-card)
-;            set color gray
-;            set shape "my-mouse"
-;            set size 2
-;            set battery 100
-;            cgp:mutate-reproduce wild-card 0.05 ;; mutation and reproduction rate, respectively
-;          ]
-;        ]
-;        ask wild-card [die]
-;      ]
-;    ]
+;  if random-float 100 < num-reproduce and battery >= 80 [  ; throw "dice" to see if you will reproduce
+;    set battery (battery / 2)               ; divide battery between parent and offspring
+;    hatch 1 [
+;      rt random-float 360 fd 1
+;      cgp:mutate-reproduce myself 0.05
+;    ]  ; hatch an offspring and move it forward 1 step
 ;  ]
 ;end
+
+to reproduce
+  if ticks mod tick-per-generation = 0 and ticks != 0 [ ;; in every num-generation tick
+    set generation generation + 1
+    set count-pickup 0
+    set count-dropoff 0
+
+    ;; calculate fitness value
+    ask robot [
+      set color red ;; to make it die
+      set fitness action-reward + battery / 10
+    ]
+
+    repeat(initial-num-robot / 10) [
+      let parent one-of (robot with-max [fitness])
+      repeat 10 [ ;; copy the robot software
+        ask one-of patches with [not any? turtles-here
+          and (pxcor != max-pxcor and pxcor != min-pxcor and pycor != max-pycor and pycor != min-pycor)] [
+          sprout-robot 1 [
+            set shape "emblem"
+            set size 2
+            set battery 100
+            set heading 0
+            rt (random 360)
+            set color green
+            set charging-tick 0
+            set fitness 0
+            cgp:mutate-reproduce parent 0.05 ;; mutation and reproduction rate, respectively
+          ]
+        ]
+      ]
+      ask parent [die]
+    ]
+    ask robot with [color = red] [die] ;; kill the rest of them
+  ]
+end
 
 to print-cgps ;; testing purpose
   ask robot [
@@ -399,7 +399,7 @@ BUTTON
 272
 NIL
 go
-NIL
+T
 1
 T
 OBSERVER
@@ -464,7 +464,10 @@ true
 true
 "" ""
 PENS
-"busses" 1.0 0 -16777216 true "" "plot count robot"
+"robot" 1.0 0 -16777216 true "" "plot count robot"
+"package" 1.0 0 -6459832 true "" "plot count package"
+"num-pickup" 1.0 0 -955883 true "" "plot count-pickup"
+"num-dropoff" 1.0 0 -11085214 true "" "plot count-dropoff"
 
 MONITOR
 115
@@ -484,10 +487,10 @@ SLIDER
 53
 initial-num-robot
 initial-num-robot
-1
+10
 50
 30.0
-1
+10
 1
 NIL
 HORIZONTAL
@@ -600,10 +603,10 @@ SLIDER
 177
 tick-per-generation
 tick-per-generation
+100
+500
+300.0
 10
-200
-50.0
-1
 1
 NIL
 HORIZONTAL
