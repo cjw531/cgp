@@ -1,7 +1,10 @@
 extensions [cgp]
 
+globals [generation]
+
 elephants-own [energy]
-patches-own [countdown]
+poachers-own [economy]
+patches-own [countdown trap]
 
 breed [elephants elephant]
 breed [poachers poacher]
@@ -16,36 +19,40 @@ to setup
     setxy random-xcor random-ycor
     set color gray + 2
     set shape "elephant"
-    set size 4
+    set size 4.5
     set energy 100
-    set heading 0
-    cgp:add-cgps
+    cgp:add-cgps 21 3 2 4 4
   ]
 
-   create-poachers num-poachers [
-    setxy random-xcor random-ycor
-    set shape "person"
-    set color white
-    set size 2.0
-  ]
+;   create-poachers num-poachers [
+;    setxy random-xcor random-ycor
+;    set shape "poacher"
+;    set color black
+;    set size 3.0
+;    set economy 10000
+;    cgp:add-cgps 21 3 2 4 4
+;  ]
 
-  repeat num-rangers [
-    ask one-of patches with [not any? rangers-here] [sprout-rangers 1 [
-      set shape "person"
-      set color black
-      set size 2.0
-      ]
-    ]
-  ]
+;  repeat num-rangers [
+;    ask one-of patches with [not any? rangers-here] [sprout-rangers 1 [
+;      set shape "ranger"
+;      set color blue
+;      set size 3.0
+;      ]
+;    ]
+;  ]
   ask patches [
-    set pcolor one-of [ green brown ]
-    ifelse pcolor = green
-    [
-      set countdown (grass-regrowth-time * 5)
-    ]
-    [
-      set countdown random (grass-regrowth-time * 5)
-    ]
+;    ifelse pxcor = 0 [ ];set pcolor black]
+;    [
+      set pcolor one-of [ green brown ]
+      ifelse pcolor = green
+      [
+        set countdown (grass-regrowth-time * 5)
+      ]
+      [
+        set countdown random (grass-regrowth-time * 5)
+      ]
+;    ]
   ]
 end
 
@@ -54,37 +61,142 @@ to go
   ask elephants [
     let obs get-observations
     let action-vector cgp:get-action obs
-    show action-vector
-    if action-vector = (list 0 0 0 )
+;    show action-vector
+
+    ifelse action-vector = (list 0 0 0)
     [
       let action one-of [1 2 3]
-      if action = 1 [fd 1]
-      if action = 2 [fd 2]
-      if action = 3 [fd 3]
+      if action = 1 [
+        fd 0.5
+        set energy energy - 1
+      ]
+      if action = 2 [
+        lt 20
+        set energy energy - 0.5
+      ]
+      if action = 3 [
+        rt 20
+        set energy energy - 0.5
+      ]
     ]
-    if action-vector = (list 1 0 0)
     [
-      fd 1
-    ]
-    if action-vector = (list 0 1 0)
-    [
-      lt 20
-    ]
-    if action-vector = (list 0 0 1)
-    [
-      rt 20
+      ;; get cumulative sums
+      let cum-sum (list)
+      set cum-sum lput (item 0 action-vector) cum-sum
+      set cum-sum lput (item 0 action-vector + item 1 action-vector) cum-sum
+      set cum-sum lput (item 1 cum-sum + item 2 action-vector) cum-sum
+
+      let n random-float sum action-vector
+
+      (ifelse n < (item 0 cum-sum) [
+        ;; do first action
+        fd 0.2
+        set energy energy - 1
+      ]
+      n < (item 1 cum-sum) [
+        ;; do second action
+        lt 20
+        set energy energy - 0.5
+      ]
+      n < (item 2 cum-sum) [
+        ;; do third action
+        rt 20
+        set energy energy - 0.5
+      ]
+      [
+        ;; else should never come here
+          print "Should not be here"
+      ])
     ]
     eat
     reproduce
+;    check-trap
     check-death
-    set energy energy - 1
   ]
+  ;;;;;;;;;;;;;;;;;;;;;;;;;
+  ;;;;;;; POACHERS SECTION
+  ;;;;;;;;;;;;;;;;;;;;;;;;;
+
+  ;; elephant kill is gain of 10700 USD
+  ;; trap cost is 2000 USD
+;  ask poachers [
+;    let obs get-observations
+;    let action-vector cgp:get-action obs
+;        ifelse action-vector = (list 0 0 0)
+;    [
+;      let action one-of [1 2 3]
+;      if action = 1 [fd 1]
+;      if action = 2 [lt 20]
+;      if action = 3 [rt 20]
+;;      if action = 4 [place-trap]
+;    ]
+;    [
+;      ;; get cumulative sums
+;      let cum-sum (list)
+;      set cum-sum lput (item 0 action-vector) cum-sum
+;      set cum-sum lput (item 0 action-vector + item 1 action-vector) cum-sum
+;      set cum-sum lput (item 1 cum-sum + item 2 action-vector) cum-sum
+;;      set cum-sum lput (item 1 cum-sum + item 2 action-vector + item 3 action-vector) cum-sum
+;
+;      let n random-float sum action-vector
+;
+;
+;      (ifelse n < (item 0 cum-sum) [
+;        ;; do first action
+;        fd 0.2
+;      ]
+;      n < (item 1 cum-sum) [
+;        ;; do second action
+;        lt 20
+;      ]
+;      n < (item 2 cum-sum) [
+;        ;; do third action
+;        rt 20
+;      ]
+;;      n < (item 3 cum-sum) [
+;;        ;; do fourth action
+;;        place-trap
+;;        print "Placed trap"
+;;      ]
+;      [
+;        ;; else should never come here
+;          print "Should not be here"
+;      ])
+;    ]
+;    kill-elephant
+;    check-bankrupt
+;  ]
 
   ask patches [
    grow-grass
   ]
 
+  if ticks mod num-generation = 0 [
+     new-gen
+   ]
+
   tick
+end
+
+to kill-elephant
+  let prey one-of elephants-here
+  if prey != nobody [
+   ; net gain of 10000
+    ask prey [die]
+    set economy economy + 10000
+  ]
+end
+
+to place-trap
+  set trap 1
+  set economy economy - 2000
+end
+
+to check-trap
+  if trap = 1 [
+   die
+   set trap 0
+  ]
 end
 
 
@@ -98,41 +210,72 @@ end
 
 to-report get-observations
   let obs []
-  rt 20
+  rt 30
   repeat 3 [
-    set obs sentence obs (get-in-cone 5 20)
+    set obs sentence obs (get-in-cone 7 20)
     lt 20
   ]
-  rt 40
-  set obs map [i -> i / 5] obs
+  rt 30
+  set obs map [i -> i / 7] obs
   report obs
 end
 
 to-report get-in-cone [dist angle]
   let obs []
-  let cone other turtles in-cone 5 20
+  let cone other turtles in-cone dist angle
   let el min-one-of cone with [is-elephant? self] [distance myself]
   if-else el = nobody [
     set obs lput 0 obs
   ]
   [
-    set obs lput (5 - ((distance el) / 2)) obs
+    set obs lput (7 - ((distance el) / 2)) obs
   ]
   let p min-one-of cone with [is-poacher? self] [distance myself]
   if-else p = nobody [
     set obs lput 0 obs
   ]
   [
-    set obs lput (5 - ((distance p) / 2)) obs
+    set obs lput (7 - ((distance p) / 2)) obs
   ]
-   let r min-one-of cone with [is-ranger? self] [distance myself]
+  let r min-one-of cone with [is-ranger? self] [distance myself]
   if-else r = nobody [
     set obs lput 0 obs
   ]
   [
-    set obs lput (5 - ((distance r) / 2)) obs
+    set obs lput (7 - ((distance r) / 2)) obs
   ]
-
+;  let pag min-one-of cone with [is-patch? self and pcolor = green] [distance myself]
+  let pag min-one-of patches in-cone (dist) (angle) with [pcolor = green] [distance myself]
+  if-else pag = nobody [
+    set obs lput 0 obs
+  ]
+  [
+    set obs lput (7 - ((distance pag) / 2)) obs
+  ]
+;  let pab min-one-of cone with [is-patch? self and pcolor = brown] [distance myself]
+  let pab min-one-of patches in-cone (dist) (angle) with [pcolor = brown] [distance myself]
+  if-else pab = nobody [
+    set obs lput 0 obs
+  ]
+  [
+    set obs lput (7 - ((distance pab) / 2)) obs
+  ]
+;  let ytrap min-one-of cone with [is-patch? self and trap = 1] [distance myself]
+  let ytrap min-one-of patches in-cone (dist) (angle) with [trap = 1] [distance myself]
+  if-else ytrap = nobody [
+    set obs lput 0 obs
+  ]
+  [
+    set obs lput (7 - ((distance ytrap) / 2)) obs
+  ]
+;  let ntrap min-one-of cone with [is-patch? self and trap = 0] [distance myself]
+  let ntrap min-one-of patches in-cone (dist) (angle) with [trap = 0] [distance myself]
+  if-else ntrap = nobody [
+    set obs lput 0 obs
+  ]
+  [
+    set obs lput (7 - ((distance ntrap) / 2)) obs
+  ]
   report obs
 end
 
@@ -141,7 +284,7 @@ to grow-grass
    ifelse countdown <= 0
    [
       set pcolor green
-      set countdown (grass-regrowth-time * 5)
+      set countdown (grass-regrowth-time * 3)
    ]
    [
       set countdown countdown - 1
@@ -156,20 +299,58 @@ end
 
 to reproduce
   ;; in here, mutate to generate an offspring
+  if random-float 100 < busses-reproduce and energy > 100[  ; throw "dice" to see if you will reproduce
+    set energy (energy / 2)               ; divide energy between parent and offspring
+    hatch 1 [
+      rt random-float 360 fd 1
+      cgp:mutate-reproduce myself 0.05 21 3 2 4 4
+    ]  ; hatch an offspring and move it forward 1 step
+  ]
+end
+
+to new-gen
+  new-gen-poachers
+  new-gen-rangers
+end
+
+to new-gen-rangers
+
+end
+
+to new-gen-poachers
+  set generation generation + 1
+  let best-poacher one-of (poachers with-max [economy])
+  if best-poacher != nobody [
+    ask poachers with [who != [who] of best-poacher] [die ]
+    repeat num-poachers [
+      create-poachers 1 [
+        setxy ([xcor] of best-poacher) ([ycor] of best-poacher)
+        set shape "poacher"
+        set color black
+        set size 3.0
+        cgp:mutate-reproduce best-poacher 0.05 21 3 2 4 4
+      ]
+    ]
+    ask best-poacher [die]
+  ]
 end
 
 to check-death
   if energy < 0 [die]
 end
+
+to check-bankrupt
+  if economy < 0 [die]
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
-236
-10
-673
-448
+398
+13
+894
+510
 -1
 -1
-13.0
+14.8
 1
 10
 1
@@ -190,10 +371,10 @@ ticks
 30.0
 
 BUTTON
-120
-241
-188
-274
+119
+315
+187
+348
 NIL
 go
 T
@@ -207,10 +388,10 @@ NIL
 1
 
 BUTTON
-26
-240
-92
-273
+25
+314
+91
+347
 NIL
 setup
 NIL
@@ -277,17 +458,17 @@ elephant-gain-from-food
 elephant-gain-from-food
 0
 100
-2.0
+10.0
 1
 1
 NIL
 HORIZONTAL
 
 PLOT
-707
-139
-1015
-418
+135
+355
+378
+527
 Populations
 NIL
 NIL
@@ -300,6 +481,7 @@ true
 "" ""
 PENS
 "elephants" 1.0 0 -16777216 true "" "plot count elephants"
+"poachers" 1.0 0 -7500403 true "" "plot count poachers"
 
 SLIDER
 18
@@ -308,21 +490,73 @@ SLIDER
 217
 grass-regrowth-time
 grass-regrowth-time
-0
 100
+1000
 100.0
-1
+10
 1
 NIL
 HORIZONTAL
 
 MONITOR
-798
-50
-886
-95
+31
+367
+119
+412
 max-energy
 max [energy] of elephants
+17
+1
+11
+
+SLIDER
+23
+229
+195
+262
+busses-reproduce
+busses-reproduce
+0
+100
+5.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+22
+267
+194
+300
+num-generation
+num-generation
+20
+1000
+200.0
+5
+1
+NIL
+HORIZONTAL
+
+MONITOR
+240
+127
+330
+172
+Generation
+generation
+17
+1
+11
+
+MONITOR
+42
+421
+114
+466
+Max Econ
+max [economy] of poachers
 17
 1
 11
@@ -472,12 +706,12 @@ Circle -7500403 true true 90 90 120
 elephant
 true
 0
-Polygon -7500403 true true 60 150
-Polygon -7500403 true true 30 165 75 105 180 105 180 150 180 105 240 105 270 150 255 210 240 225 225 210 240 180 210 195 210 240 180 240 180 195 135 195 120 210 135 240 90 240 90 195 60 180 60 150 30 180 30 165
-Circle -16777216 false false 255 150 0
-Circle -1 false false 255 150 0
-Circle -1 false false 255 150 0
-Circle -1 true false 225 135 0
+Polygon -7500403 true true 150 240
+Polygon -7500403 true true 165 270 105 225 105 120 150 120 105 120 105 60 150 30 210 45 225 60 210 75 180 60 195 90 240 90 240 120 195 120 195 165 210 180 240 165 240 210 195 210 180 240 150 240 180 270 165 270
+Circle -16777216 false false 150 45 0
+Circle -1 false false 150 45 0
+Circle -1 false false 150 45 0
+Circle -1 true false 135 75 0
 
 face happy
 false
@@ -586,6 +820,30 @@ Polygon -7500403 true true 165 180 165 210 225 180 255 120 210 135
 Polygon -7500403 true true 135 105 90 60 45 45 75 105 135 135
 Polygon -7500403 true true 165 105 165 135 225 105 255 45 210 60
 Polygon -7500403 true true 135 90 120 45 150 15 180 45 165 90
+
+poacher
+true
+0
+Circle -7500403 true true 56 56 67
+Polygon -7500403 true true 75 120 75 210 105 210 105 120 75 120
+Polygon -7500403 true true 75 210 75 270 90 270 90 210 75 210
+Polygon -7500403 true true 105 210 120 270 105 270 90 210 105 210
+Polygon -7500403 true true 195 165 195 180 180 180 180 165 195 165
+Polygon -7500403 true true 180 150 180 195 120 195 120 150 180 150
+Polygon -7500403 true true 135 195 135 240 150 240 150 195 135 195
+Polygon -7500403 true true 105 165 120 165 120 180 105 180 105 165
+
+ranger
+true
+0
+Circle -7500403 true true 120 60 60
+Polygon -7500403 true true 135 120 135 195 165 195 165 120 135 120
+Polygon -7500403 true true 135 195 135 255 150 255 150 195 135 195
+Polygon -7500403 true true 165 195 180 255 165 255 150 195 165 195
+Polygon -7500403 true true 120 75 105 45 195 45 180 75 150 60 135 60 120 75
+Polygon -7500403 true true 90 165
+Polygon -7500403 true true 135 135 120 195 105 180 135 120 135 135
+Polygon -7500403 true true 165 120 195 180 180 195 165 135 165 120
 
 sheep
 false
