@@ -351,12 +351,12 @@ to new-gen-poachers
 end
 
 to check-death
-  if age > max-age [die]
-  if energy < 0 [die]
+  if age > max-age [cgp:clear-cgp die]
+  if energy < 0 [cgp:clear-cgp die]
 end
 
 to check-bankrupt
-  if economy < 0 [die]
+  if economy < 0 [cgp:clear-cgp die]
 end
 @#$#@#$#@
 GRAPHICS-WINDOW

@@ -460,6 +460,7 @@ class cgp extends api.DefaultClassManager {
     manager.addPrimitive("get-cgp-list", getCgpList)
     manager.addPrimitive("get-action", getAction)
     manager.addPrimitive("mutate-reproduce", mutate_reproduce)
+    manager.addPrimitive(name="clear-cgp", clearCgp)
   }
 
 
@@ -525,6 +526,15 @@ class cgp extends api.DefaultClassManager {
       context.getAgent match {
         case turtle: api.Turtle => turtlesToCgps.update(turtle, net)
       }
+    }
+  }
+
+  object clearCgp extends api.Command {
+    override def getSyntax =
+      Syntax.commandSyntax(right = List(), agentClassString = "-T--")
+
+    def perform(args: Array[Argument], context: Context): Unit = {
+      turtlesToCgps.remove(context.getAgent.asInstanceOf[api.Turtle])
     }
   }
 
