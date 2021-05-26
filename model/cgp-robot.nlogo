@@ -1,8 +1,22 @@
+;;; TA COMMENTS
+
+;;; Your code is fine. But I have some big questions about the model here:
+
+;;; 1. Why does a robot get battery from delivering a package? How can battery be both a reward AND a part of the system ("I need to go charge.")
+;;; 2. Why do you need the CGP extension? If the CGP extension contains all of the agent cognition...then why do you need model?
+;;; 3. How do robots get their destinations?
+;;; 4. Why do you not have sliders for robot traits?
+;;; 5. Is battery your `fitness` now? If so, you should justify that. Especially since this could cause robots NOT moving
+;;;    to evolve (as that would preserve their battery possibly even more so than delivering the package). Not sure that this
+;;;    is what you meant to model.
+
+;;; A few smaller things below (search for ;;;)
+
 extensions [cgp]
 
 globals [generation]
 
-turtles-own [energy] ; poisoned removed
+turtles-own [battery action-reward charging-tick is-charging]
 package-own [age]
 charger-own [age]
 
@@ -21,10 +35,11 @@ to setup
       sprout-robot 1 [
         set shape "emblem"
         set size 2
-        set energy 100
+        set battery 100
         set heading 0
         rt (random 360)
         set color green
+        set charging-tick 0
         cgp:add-cgps
       ]
     ]
@@ -84,7 +99,39 @@ end
 
 to go
   ask robot [
-    let obs get-observations
+    show battery
+    show action-reward
+
+    let tick-check charging-tick
+    (ifelse tick-check = 0 [
+      observation-to-action ;; put observation of each robot to cgp and solve the cgp
+      pickup-dropoff ;; check for their task performance
+      check-death ;; check whether the robot should die or not
+      reproduce ;; reproduce
+    ] charging-tick = 1 [ ;; charging on hold but move out robot
+      fd 1.5 ;; send robot out of charging station
+      set charging-tick charging-tick - 1 ;; make it 0
+    ]
+    [ set charging-tick charging-tick - 1 ]) ;; charing on hold
+  ]
+
+  ask package [
+    set age age + 1
+    if age > 400 [die]
+  ]
+
+;  ask charger [
+;    set age age + 1
+;    if age > 100 [die]
+;  ]
+
+  create-new-items
+  if not any? robot [ stop ]
+  tick
+end
+
+to observation-to-action
+  let obs get-observations
     let action-vector cgp:get-action obs
 ;    show action-vector ;; testing purpose
 
@@ -95,81 +142,65 @@ to go
       if action = 3 [rt 20]
     ]
     [
+
+      ;;; What is all of this stuff below? It's totally opaque. You'll either need comments
+      ;;; or to write in a style that can be readable
+
       ;; get cumulative sums
+    ;; weighted choice: https://softwareengineering.stackexchange.com/questions/150616/get-weighted-random-item
       let cum-sum (list)
       set cum-sum lput (item 0 action-vector) cum-sum
       set cum-sum lput (item 0 action-vector + item 1 action-vector) cum-sum
       set cum-sum lput (item 1 cum-sum + item 2 action-vector) cum-sum
 
-      let n random-float sum action-vector
+      let n random-float sum action-vector ;; roll the dice
 
-      (ifelse n < (item 0 cum-sum) [
-        ;; do first action
+      ;; randomly choose an action to perform
+      (ifelse n < (item 0 cum-sum) [ ;; perform first action
         fd 0.2
-        set energy energy - 1
+        set battery battery - 1
       ]
-      n < (item 1 cum-sum) [
-        ;; do second action
+      n < (item 1 cum-sum) [ ;; perform second action
         lt 20
-        set energy energy - 0.5
+        set battery battery - 0.5
       ]
-      n < (item 2 cum-sum) [
-        ;; do third action
+      n < (item 2 cum-sum) [ ;; perform third action
         rt 20
-        set energy energy - 0.5
+        set battery battery - 0.5
       ]
       [
         ;; else should never come here
           print "Should not be here"
       ])
     ]
-
-    pickup-dropoff
-    check-death
-    reproduce
-  ]
-
-  ask package [
-    set age age + 1
-    if age > 400 [die]
-  ]
-
-  ask charger [
-    set age age + 1
-    if age > 100 [die]
-  ]
-
-  create-new-items
-  if not any? robot [ stop ]
-  tick
 end
 
 to pickup-dropoff
   let pick one-of package-here ;; check for pick-up
   if pick != nobody and color != orange [
     ask pick [die]
-    set energy energy + 10
+    set action-reward action-reward + 10
     set color orange
   ]
 
   let destination patch-here ;; check if it is on drop-off area
   if destination != nobody and pcolor = 118 and color = orange [
-    set energy energy + 10
+    set action-reward action-reward + 10
     set color green
   ]
 
   let wall patch-here ;; check whether the robot is in wall
-  if wall != nobody and pcolor = red [
-    set energy energy - 3
-    rt 180
+  if wall != nobody and pcolor = red [ ;; if bumped
+    set action-reward action-reward - 5
+    rt 180 ;; turn around
+    fd 1 ;; move off from the wall
   ]
 
   let charging one-of charger-here ;; recharge the robot
-  if charging != nobody [
-    set energy 100
+  if charging != nobody and charging-tick = 0 [
+    set charging-tick ceiling (tick-per-generation * 0.05) + 1 ;; hold for 5% time of each generation
+    set battery 100
   ]
-  ;; hold while charging:
-  ;; https://stackoverflow.com/questions/59470217/how-to-make-agent-stay-at-certain-patch-in-netlogo-within-certain-ticks
 end
 
 to-report get-observations
@@ -187,6 +218,9 @@ end
 
 to-report get-in-cone [dist angle]
   let obs []
+
+  ;;; Again, why are you using these magic cone numbers?
+
   let cone other turtles in-cone 7 20
   let front-patches patches in-cone 7 20
 
@@ -238,9 +272,12 @@ to create-new-items
   ]
 end
 
+
+;;; Is this directed reproduction? Or does it just happen to do this because of battery? Where is the fitness measured?
+
 to reproduce
-  if random-float 100 < num-reproduce and energy >= 80[  ; throw "dice" to see if you will reproduce
-    set energy (energy / 2)               ; divide energy between parent and offspring
+  if random-float 100 < num-reproduce and battery >= 80 [  ; throw "dice" to see if you will reproduce
+    set battery (battery / 2)               ; divide battery between parent and offspring
     hatch 1 [
       rt random-float 360 fd 1
       cgp:mutate-reproduce myself 0.05
@@ -249,7 +286,7 @@ to reproduce
 end
 
 to check-death
-  if energy < 0 [die]
+  if battery < 0 [die]
 end
 
 ;to reproduce
@@ -257,9 +294,9 @@ end
 ;    if ticks mod num-generation = 0 [ ;; in every num-generation tick
 ;      set generation generation + 1
 ;
-;      let parent one-of (busses with-max [energy])
-;      let wild-card one-of (busses with [energy > (([energy] of parent) - 50)])
-;      ;    ask busses [set parent max-one-of busses [energy] ] ;; highest energy
+;      let parent one-of (busses with-max [battery])
+;      let wild-card one-of (busses with [battery > (([battery] of parent) - 50)])
+;      ;    ask busses [set parent max-one-of busses [battery] ] ;; highest battery
 ;      if parent != nobody [
 ;        ask busses with [(who != [who] of parent) and (who != [who] of wild-card)]
 ;        [
@@ -271,7 +308,7 @@ end
 ;            set color gray
 ;            set shape "my-mouse"
 ;            set size 2
-;            set energy 100
+;            set battery 100
 ;            cgp:mutate-reproduce parent 0.05 ;; mutation and reproduction rate, respectively
 ;          ]
 ;        ]
@@ -285,7 +322,7 @@ end
 ;            set color gray
 ;            set shape "my-mouse"
 ;            set size 2
-;            set energy 100
+;            set battery 100
 ;            cgp:mutate-reproduce wild-card 0.05 ;; mutation and reproduction rate, respectively
 ;          ]
 ;        ]
@@ -357,12 +394,12 @@ ticks
 
 BUTTON
 120
-226
+239
 188
-259
+272
 NIL
 go
-T
+NIL
 1
 T
 OBSERVER
@@ -385,9 +422,9 @@ Number
 
 BUTTON
 46
-226
+239
 112
-259
+272
 NIL
 setup
 NIL
@@ -401,10 +438,10 @@ NIL
 1
 
 MONITOR
-34
-156
-91
-201
+39
+192
+96
+237
 Robot
 count robot
 17
@@ -430,12 +467,12 @@ PENS
 "busses" 1.0 0 -16777216 true "" "plot count robot"
 
 MONITOR
-110
-155
-189
-200
+115
+191
+194
+236
 max energy
-max [energy] of robot
+max [battery] of robot
 17
 1
 11
@@ -550,7 +587,22 @@ num-reproduce
 num-reproduce
 0
 100
-5.0
+13.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+34
+144
+229
+177
+tick-per-generation
+tick-per-generation
+10
+200
+50.0
 1
 1
 NIL
