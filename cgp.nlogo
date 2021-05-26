@@ -2,13 +2,14 @@ extensions [cgp]
 
 globals [generation]
 
-elephants-own [energy]
-poachers-own [economy]
+elephants-own [energy age]
+poachers-own [economy cooldown]
 patches-own [countdown trap]
 
 breed [elephants elephant]
 breed [poachers poacher]
 breed [rangers ranger]
+breed [traps a-trap]
 
 
 to setup
@@ -21,7 +22,8 @@ to setup
     set shape "elephant"
     set size 4.5
     set energy 100
-    cgp:add-cgps 21 3 2 4 4
+    cgp:add-cgps 15 3 2 4 4
+    set age 1
   ]
 
 ;   create-poachers num-poachers [
@@ -29,10 +31,10 @@ to setup
 ;    set shape "poacher"
 ;    set color black
 ;    set size 3.0
-;    set economy 10000
+;    set economy 0
 ;    cgp:add-cgps 21 3 2 4 4
 ;  ]
-
+;
 ;  repeat num-rangers [
 ;    ask one-of patches with [not any? rangers-here] [sprout-rangers 1 [
 ;      set shape "ranger"
@@ -110,8 +112,9 @@ to go
     ]
     eat
     reproduce
-;    check-trap
+    check-trap
     check-death
+    set age age + 1
   ]
   ;;;;;;;;;;;;;;;;;;;;;;;;;
   ;;;;;;; POACHERS SECTION
@@ -125,7 +128,7 @@ to go
 ;        ifelse action-vector = (list 0 0 0)
 ;    [
 ;      let action one-of [1 2 3]
-;      if action = 1 [fd 1]
+;      if action = 1 [fd 0.2]
 ;      if action = 2 [lt 20]
 ;      if action = 3 [rt 20]
 ;;      if action = 4 [place-trap]
@@ -153,17 +156,18 @@ to go
 ;        ;; do third action
 ;        rt 20
 ;      ]
-;;      n < (item 3 cum-sum) [
-;;        ;; do fourth action
-;;        place-trap
-;;        print "Placed trap"
-;;      ]
 ;      [
 ;        ;; else should never come here
 ;          print "Should not be here"
 ;      ])
 ;    ]
 ;    kill-elephant
+;    ifelse cooldown = 0  [
+;      place-trap
+;    ]
+;    [
+;     set cooldown cooldown - 1
+;    ]
 ;    check-bankrupt
 ;  ]
 
@@ -174,7 +178,7 @@ to go
   if ticks mod num-generation = 0 [
      new-gen
    ]
-
+  if count elephants = 0 [ stop ]
   tick
 end
 
@@ -188,17 +192,28 @@ to kill-elephant
 end
 
 to place-trap
-  set trap 1
-  set economy economy - 2000
-end
-
-to check-trap
-  if trap = 1 [
-   die
-   set trap 0
+  if economy > 2000
+  [
+    if random 100 < prob-set-trap and trap = 0 [
+;      print "Set trap"
+      set trap 1
+      set cooldown trap-cooldown
+      set economy economy - 2000
+      hatch-traps 1[
+        set shape "trap"
+        set color red
+      ]
+    ]
   ]
 end
 
+to check-trap
+;  if trap = 1 [
+;   ask traps-on patch-here [die]
+;   set trap 0
+;   die
+;  ]
+end
 
 to eat
   if pcolor = green [
@@ -244,7 +259,6 @@ to-report get-in-cone [dist angle]
   [
     set obs lput (7 - ((distance r) / 2)) obs
   ]
-;  let pag min-one-of cone with [is-patch? self and pcolor = green] [distance myself]
   let pag min-one-of patches in-cone (dist) (angle) with [pcolor = green] [distance myself]
   if-else pag = nobody [
     set obs lput 0 obs
@@ -252,7 +266,6 @@ to-report get-in-cone [dist angle]
   [
     set obs lput (7 - ((distance pag) / 2)) obs
   ]
-;  let pab min-one-of cone with [is-patch? self and pcolor = brown] [distance myself]
   let pab min-one-of patches in-cone (dist) (angle) with [pcolor = brown] [distance myself]
   if-else pab = nobody [
     set obs lput 0 obs
@@ -260,22 +273,20 @@ to-report get-in-cone [dist angle]
   [
     set obs lput (7 - ((distance pab) / 2)) obs
   ]
-;  let ytrap min-one-of cone with [is-patch? self and trap = 1] [distance myself]
-  let ytrap min-one-of patches in-cone (dist) (angle) with [trap = 1] [distance myself]
-  if-else ytrap = nobody [
-    set obs lput 0 obs
-  ]
-  [
-    set obs lput (7 - ((distance ytrap) / 2)) obs
-  ]
-;  let ntrap min-one-of cone with [is-patch? self and trap = 0] [distance myself]
-  let ntrap min-one-of patches in-cone (dist) (angle) with [trap = 0] [distance myself]
-  if-else ntrap = nobody [
-    set obs lput 0 obs
-  ]
-  [
-    set obs lput (7 - ((distance ntrap) / 2)) obs
-  ]
+;  let ytrap min-one-of patches in-cone (dist) (angle) with [trap = 1] [distance myself]
+;  if-else ytrap = nobody [
+;    set obs lput 0 obs
+;  ]
+;  [
+;    set obs lput (7 - ((distance ytrap) / 2)) obs
+;  ]
+;  let ntrap min-one-of patches in-cone (dist) (angle) with [trap = 0] [distance myself]
+;  if-else ntrap = nobody [
+;    set obs lput 0 obs
+;  ]
+;  [
+;    set obs lput (7 - ((distance ntrap) / 2)) obs
+;  ]
   report obs
 end
 
@@ -303,7 +314,8 @@ to reproduce
     set energy (energy / 2)               ; divide energy between parent and offspring
     hatch 1 [
       rt random-float 360 fd 1
-      cgp:mutate-reproduce myself 0.05 21 3 2 4 4
+      cgp:mutate-reproduce myself 0.05 15 3 2 4 4
+      set age 1
     ]  ; hatch an offspring and move it forward 1 step
   ]
 end
@@ -329,6 +341,9 @@ to new-gen-poachers
         set color black
         set size 3.0
         cgp:mutate-reproduce best-poacher 0.05 21 3 2 4 4
+        set economy 0
+        setxy random-xcor random-ycor
+        set cooldown trap-cooldown
       ]
     ]
     ask best-poacher [die]
@@ -336,6 +351,7 @@ to new-gen-poachers
 end
 
 to check-death
+  if age > max-age [die]
   if energy < 0 [die]
 end
 
@@ -492,7 +508,7 @@ grass-regrowth-time
 grass-regrowth-time
 100
 1000
-100.0
+120.0
 10
 1
 NIL
@@ -557,6 +573,62 @@ MONITOR
 466
 Max Econ
 max [economy] of poachers
+17
+1
+11
+
+SLIDER
+213
+234
+385
+267
+prob-set-trap
+prob-set-trap
+0
+100
+5.0
+5
+1
+NIL
+HORIZONTAL
+
+SLIDER
+213
+275
+385
+308
+trap-cooldown
+trap-cooldown
+20
+500
+80.0
+20
+1
+NIL
+HORIZONTAL
+
+SLIDER
+210
+16
+382
+49
+max-age
+max-age
+500
+2000
+1010.0
+10
+1
+NIL
+HORIZONTAL
+
+MONITOR
+248
+71
+305
+116
+Age
+max [age] of elephants
 17
 1
 11
@@ -885,6 +957,19 @@ Circle -16777216 true false 30 30 240
 Circle -7500403 true true 60 60 180
 Circle -16777216 true false 90 90 120
 Circle -7500403 true true 120 120 60
+
+trap
+true
+1
+Polygon -7500403 true false 90 120 105 75 120 120 90 120
+Polygon -7500403 true false 135 120 150 75 165 120 135 120
+Polygon -7500403 true false 180 120 195 75 210 120 180 120
+Polygon -7500403 true false 90 180 105 135 120 180 90 180
+Polygon -7500403 true false 135 180 150 135 165 180 135 180
+Polygon -7500403 true false 180 180 195 135 210 180 180 180
+Polygon -7500403 true false 90 240 105 195 120 240 90 240
+Polygon -7500403 true false 135 240 150 195 165 240 135 240
+Polygon -7500403 true false 180 240 195 195 210 240 180 240
 
 tree
 false

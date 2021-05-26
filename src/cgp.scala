@@ -230,7 +230,7 @@ class cgp extends api.DefaultClassManager {
 
       var g_index = 0
       if (total > 0) {
-        predictions = predictions.map(x => x / total)
+        predictions = predictions.map(x => 0.0 / 1.0)
         return predictions
         //        // weighted choice: https://softwareengineering.stackexchange.com/questions/150616/get-weighted-random-item
         //
