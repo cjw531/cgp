@@ -22,27 +22,27 @@ to setup
     set shape "elephant"
     set size 4.5
     set energy 100
-    cgp:add-cgps 15 3 2 4 4
+    cgp:add-cgps 21 3 4 12 12 ;; inputs outputs lvls rows cols
     set age 1
   ]
 
-;   create-poachers num-poachers [
-;    setxy random-xcor random-ycor
-;    set shape "poacher"
-;    set color black
-;    set size 3.0
-;    set economy 0
-;    cgp:add-cgps 21 3 2 4 4
-;  ]
-;
+   create-poachers num-poachers [
+    setxy random-xcor random-ycor
+    set shape "poacher"
+    set color black
+    set size 3.0
+    set economy 0
+    cgp:add-cgps 21 3 2 4 4
+  ]
+
 ;  repeat num-rangers [
-;    ask one-of patches with [not any? rangers-here] [sprout-rangers 1 [
-;      set shape "ranger"
-;      set color blue
-;      set size 3.0
-;      ]
-;    ]
-;  ]
+    ask one-of patches with [not any? rangers-here] [sprout-rangers 1 [
+      set shape "ranger"
+      set color blue
+      set size 3.0
+      ]
+    ]
+  ]
   ask patches [
 ;    ifelse pxcor = 0 [ ];set pcolor black]
 ;    [
@@ -88,6 +88,8 @@ to go
       set cum-sum lput (item 0 action-vector + item 1 action-vector) cum-sum
       set cum-sum lput (item 1 cum-sum + item 2 action-vector) cum-sum
 
+;      show action-vector
+
       let n random-float sum action-vector
 
       (ifelse n < (item 0 cum-sum) [
@@ -100,7 +102,7 @@ to go
         lt 20
         set energy energy - 0.5
       ]
-      n < (item 2 cum-sum) [
+      n <= (item 2 cum-sum) [
         ;; do third action
         rt 20
         set energy energy - 0.5
@@ -120,56 +122,56 @@ to go
   ;;;;;;; POACHERS SECTION
   ;;;;;;;;;;;;;;;;;;;;;;;;;
 
-  ;; elephant kill is gain of 10700 USD
-  ;; trap cost is 2000 USD
-;  ask poachers [
-;    let obs get-observations
-;    let action-vector cgp:get-action obs
-;        ifelse action-vector = (list 0 0 0)
-;    [
-;      let action one-of [1 2 3]
-;      if action = 1 [fd 0.2]
-;      if action = 2 [lt 20]
-;      if action = 3 [rt 20]
-;;      if action = 4 [place-trap]
-;    ]
-;    [
-;      ;; get cumulative sums
-;      let cum-sum (list)
-;      set cum-sum lput (item 0 action-vector) cum-sum
-;      set cum-sum lput (item 0 action-vector + item 1 action-vector) cum-sum
-;      set cum-sum lput (item 1 cum-sum + item 2 action-vector) cum-sum
-;;      set cum-sum lput (item 1 cum-sum + item 2 action-vector + item 3 action-vector) cum-sum
-;
-;      let n random-float sum action-vector
-;
-;
-;      (ifelse n < (item 0 cum-sum) [
-;        ;; do first action
-;        fd 0.2
-;      ]
-;      n < (item 1 cum-sum) [
-;        ;; do second action
-;        lt 20
-;      ]
-;      n < (item 2 cum-sum) [
-;        ;; do third action
-;        rt 20
-;      ]
-;      [
-;        ;; else should never come here
-;          print "Should not be here"
-;      ])
-;    ]
-;    kill-elephant
-;    ifelse cooldown = 0  [
-;      place-trap
-;    ]
-;    [
-;     set cooldown cooldown - 1
-;    ]
-;    check-bankrupt
-;  ]
+  ; elephant kill is gain of 10700 USD
+  ; trap cost is 2000 USD
+  ask poachers [
+    let obs get-observations
+    let action-vector cgp:get-action obs
+        ifelse action-vector = (list 0 0 0)
+    [
+      let action one-of [1 2 3]
+      if action = 1 [fd 0.2]
+      if action = 2 [lt 20]
+      if action = 3 [rt 20]
+;      if action = 4 [place-trap]
+    ]
+    [
+      ;; get cumulative sums
+      let cum-sum (list)
+      set cum-sum lput (item 0 action-vector) cum-sum
+      set cum-sum lput (item 0 action-vector + item 1 action-vector) cum-sum
+      set cum-sum lput (item 1 cum-sum + item 2 action-vector) cum-sum
+;      set cum-sum lput (item 1 cum-sum + item 2 action-vector + item 3 action-vector) cum-sum
+
+      let n random-float sum action-vector
+
+
+      (ifelse n < (item 0 cum-sum) [
+        ;; do first action
+        fd 0.2
+      ]
+      n < (item 1 cum-sum) [
+        ;; do second action
+        lt 20
+      ]
+      n < (item 2 cum-sum) [
+        ;; do third action
+        rt 20
+      ]
+      [
+        ;; else should never come here
+          print "Should not be here"
+      ])
+    ]
+    kill-elephant
+    ifelse cooldown = 0  [
+      place-trap
+    ]
+    [
+     set cooldown cooldown - 1
+    ]
+    check-bankrupt
+  ]
 
   ask patches [
    grow-grass
@@ -208,11 +210,11 @@ to place-trap
 end
 
 to check-trap
-;  if trap = 1 [
-;   ask traps-on patch-here [die]
-;   set trap 0
-;   die
-;  ]
+  if trap = 1 [
+   ask traps-on patch-here [die]
+   set trap 0
+   die
+  ]
 end
 
 to eat
@@ -273,20 +275,20 @@ to-report get-in-cone [dist angle]
   [
     set obs lput (7 - ((distance pab) / 2)) obs
   ]
-;  let ytrap min-one-of patches in-cone (dist) (angle) with [trap = 1] [distance myself]
-;  if-else ytrap = nobody [
-;    set obs lput 0 obs
-;  ]
-;  [
-;    set obs lput (7 - ((distance ytrap) / 2)) obs
-;  ]
-;  let ntrap min-one-of patches in-cone (dist) (angle) with [trap = 0] [distance myself]
-;  if-else ntrap = nobody [
-;    set obs lput 0 obs
-;  ]
-;  [
-;    set obs lput (7 - ((distance ntrap) / 2)) obs
-;  ]
+  let ytrap min-one-of patches in-cone (dist) (angle) with [trap = 1] [distance myself]
+  if-else ytrap = nobody [
+    set obs lput 0 obs
+  ]
+  [
+    set obs lput (7 - ((distance ytrap) / 2)) obs
+  ]
+  let ntrap min-one-of patches in-cone (dist) (angle) with [trap = 0] [distance myself]
+  if-else ntrap = nobody [
+    set obs lput 0 obs
+  ]
+  [
+    set obs lput (7 - ((distance ntrap) / 2)) obs
+  ]
   report obs
 end
 
@@ -314,7 +316,7 @@ to reproduce
     set energy (energy / 2)               ; divide energy between parent and offspring
     hatch 1 [
       rt random-float 360 fd 1
-      cgp:mutate-reproduce myself 0.05 15 3 2 4 4
+      cgp:mutate-reproduce myself mutation-diff-percent 21 3 4 12 12
       set age 1
     ]  ; hatch an offspring and move it forward 1 step
   ]
@@ -340,7 +342,7 @@ to new-gen-poachers
         set shape "poacher"
         set color black
         set size 3.0
-        cgp:mutate-reproduce best-poacher 0.05 21 3 2 4 4
+        cgp:mutate-reproduce best-poacher mutation-diff-percent 21 3 2 4 4
         set economy 0
         setxy random-xcor random-ycor
         set cooldown trap-cooldown
@@ -429,7 +431,7 @@ num-elephants
 num-elephants
 0
 100
-10.0
+9.0
 1
 1
 NIL
@@ -632,6 +634,21 @@ max [age] of elephants
 17
 1
 11
+
+SLIDER
+212
+191
+406
+224
+mutation-diff-percent
+mutation-diff-percent
+0
+0.2
+0.05
+0.01
+1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
