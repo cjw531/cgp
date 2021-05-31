@@ -21,7 +21,7 @@ to setup
     set energy 100
     set heading 90
     set is-first true
-    cgp:add-cgps
+    cgp:add-cgps 9 3 2 5 5
   ]
 
   repeat initial-num-inmate [
@@ -49,13 +49,6 @@ to setup
   ]
 end
 
-to print-cgps
-  ask busses[
-    let cgps cgp:get-cgp-list
-    show cgps
-  ]
-end
-
 
 to go
   ask busses [
@@ -63,7 +56,7 @@ to go
     if is-first [
       let obs get-observations
       set action-vector cgp:get-action obs
-      show action-vector ;; raw probabilities
+;      show action-vector ;; raw probabilities
     ]
 
     ifelse action-vector = (list 0 0 0)
@@ -98,26 +91,6 @@ to go
         ;; else
       ])
     ]
-
-;    if action-vector = (list 0 0 0 )
-;    [
-;      let action one-of [1 2 3]
-;      if action = 1 [fd 1]
-;      if action = 2 [lt 20]
-;      if action = 3 [rt 20]
-;    ]
-;    if action-vector = (list 1 0 0)
-;    [
-;      fd 1
-;    ]
-;    if action-vector = (list 0 1 0)
-;    [
-;      lt 20
-;    ]
-;    if action-vector = (list 0 0 1)
-;    [
-;      rt 20
-;    ]
     check-death
     set energy energy - 1
   ]
@@ -255,7 +228,7 @@ to reproduce
           ;; TODO: mutate the action vector as well
 ;          cgp:mutate-action action-vector [action-vector] of parent mutation-rate
           ;; parent, mutation rate, and parent's action set, respectively
-          cgp:mutate-reproduce parent mutation-rate
+          cgp:mutate-reproduce parent mutation-rate 9 3 2 5 5
         ]
       ]
     ]
