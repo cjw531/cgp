@@ -33,7 +33,7 @@ end
 to create-initial-cgps
   create-turtles initial-num-cgps
   ask turtles [
-    cgp:add-cgps 1 1 5 10 10 ; inputs outputs lvls_back rows cols
+    cgp:add-cgps 2 1 5 1 5 ; inputs outputs lvls_back rows cols
   ]
 end
 
@@ -43,7 +43,7 @@ to evaluate-cgps-against-points [points]
     set pred-points []
     foreach points [
       x ->
-      set predictions lput (cgp:get-action x) predictions
+      set predictions lput (item 0 (cgp:get-action (list (x) (x)))) predictions
       set pred-points lput x pred-points
     ]
     let true-vals true-function points
