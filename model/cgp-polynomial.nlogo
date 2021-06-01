@@ -25,7 +25,7 @@ to-report true-function [points]
   let true-vals []
   foreach points [
     x ->
-    set true-vals lput ((x ^ 3) + x) true-vals
+    set true-vals lput ((x ^ 4) + (x ^ 2) - x) true-vals
   ]
   report true-vals
 end
@@ -33,7 +33,7 @@ end
 to create-initial-cgps
   create-turtles initial-num-cgps
   ask turtles [
-    cgp:add-cgps 1 1 5 1 5
+    cgp:add-cgps 1 1 5 5 10 ; inputs outputs lvls_back rows cols
   ]
 end
 

@@ -78,20 +78,26 @@ class cgp extends api.DefaultClassManager {
       /////////////////////////
       def create_cgp(): Unit = {
         // make graph
-        /////// create nodes with linkeage back to any of the nodes
-        var last_node_number_in_column = 0
-        for (i <- 1 to (this.num_rows * this.num_cols)) {
+        /////// create nodes with linkage back to any of the nodes
+        var last_node_number_in_column = this.num_inputs - 1
+        var row_counter = 1
+        for (i <- this.num_inputs to (this.num_rows * this.num_cols)) {
           var incoming1 = 0
           var incoming2 = 0
-          if ((i - 1) > 0) {
-            incoming1 = r.nextInt(i - 1) // pick random node before it
-            incoming2 = r.nextInt(i - 1)
+          if (last_node_number_in_column > 0) {
+            incoming1 = r.nextInt(last_node_number_in_column) // pick random node before it
+            incoming2 = r.nextInt(last_node_number_in_column)
           }
           var new_node = new Node(i, r.nextInt(funcs.total_funcs), incoming1, incoming2)
           this.node_list += new_node
+          if (row_counter % this.num_rows == 0) {
+            last_node_number_in_column = i
+            println(last_node_number_in_column)
+            row_counter = 0
+          }
+          row_counter += 1
         }
-
-        // connect output to any
+        // connect output to any previous nodes
         this.OutputConnection = r.nextInt(this.num_inputs + (this.num_rows*this.num_cols) - 1)
       }
 
@@ -180,7 +186,7 @@ class cgp extends api.DefaultClassManager {
     /////////////////////////
     def mutate_cgp(parent_cgp: Cgp, mutation_rate: Double): Cgp = {
       // deep copy CGP
-      var mutated_cgp = new Cgp(1, 1, 5, 1, 5)
+      var mutated_cgp = new Cgp(parent_cgp.num_inputs, parent_cgp.num_outputs, parent_cgp.lvls_back, parent_cgp.num_rows, parent_cgp.num_cols)
       var node_list_copied = ListBuffer[Node]()
       for (node <- parent_cgp.node_list) {
         var copied_node = new Node(node.number, node.func_idx, node.Incoming1, node.Incoming2)
@@ -194,8 +200,9 @@ class cgp extends api.DefaultClassManager {
       // remake nodes by certain probability
       var flag_changed = false
       while (flag_changed == false) {
+        var last_node_number_in_column = mutated_cgp.num_inputs - 1
+        var row_counter = 1
         for (node_idx <- 0 to (mutated_cgp.node_list.length - 1) + mutated_cgp.num_outputs) {
-          // change: make it possible for edge of output to change
           if (node_idx > mutated_cgp.node_list.length - 1) {
             val prob = r.nextDouble * 100
             if (prob <= mutation_rate) {
@@ -210,12 +217,17 @@ class cgp extends api.DefaultClassManager {
               flag_changed = true // mark that a change was made
               // alter an entire node (alter incoming edges and function)
               node.set_func_idx(r.nextInt(3))
-              if (node.number - 1 > 0) {
-                node.set_incoming_node_1(r.nextInt(node.number - 1))
-                node.set_incoming_node_2(r.nextInt(node.number - 1))
+              if (last_node_number_in_column > 0) {
+                node.set_incoming_node_1(r.nextInt(last_node_number_in_column))
+                node.set_incoming_node_2(r.nextInt(last_node_number_in_column))
               }
             }
           }
+          if (row_counter % mutated_cgp.num_rows == 0) {
+            last_node_number_in_column = node_idx + 1
+            row_counter = 0
+          }
+          row_counter += 1
         }
       }
 
@@ -224,64 +236,9 @@ class cgp extends api.DefaultClassManager {
       return mutated_cgp
     }
 
-    //  println("Hi")
-//    var cgp = new Cgp(1, 1, 5, 1, 5)
-//    cgp.create_cgp()
-//    cgp.find_active_nodes()
-//
-//    var mutatedCgp = mutate_cgp(cgp, 0.05)
-
     def func_to_eval(point: Double): Double = {
       (point * point * point) + point
     }
-
-//    val r = scala.util.Random
-//
-//    // create initial CGPs
-//    val initial_num_cgps = 15
-//    var lowest_mse = Double.MaxValue
-//    var parent_cgp: Cgp = _
-//    for (i <- 0 to initial_num_cgps) {
-//      var new_cgp = new Cgp(1, 1, 5, 1, 5)
-//      new_cgp.create_cgp()
-//      new_cgp.find_active_nodes()
-//      var error_val = evaluate_CGP_against_points(new_cgp)
-//      print("Error: ")
-//      println(error_val)
-//      if (error_val < lowest_mse) {
-//        lowest_mse = error_val
-//        parent_cgp = new_cgp
-//      }
-//    }
-
-//    // mutate best ones
-//    var generation = 0
-//    val num_offspring = 5
-//    lowest_mse = Double.MaxValue
-//    var curr_best_offspring: Cgp = _
-//    while (lowest_mse > 0) {
-//      lowest_mse = Double.MaxValue
-//      var parent_error = evaluate_CGP_against_points(parent_cgp)
-//      if (parent_error < lowest_mse) {
-//        lowest_mse = parent_error
-//        curr_best_offspring = parent_cgp
-//      }
-//      for (i <- 0 to num_offspring) {
-//        var offspring_cgp = mutate_cgp(parent_cgp, 0.05)
-//        var error_val = evaluate_CGP_against_points(offspring_cgp)
-//        if (error_val < lowest_mse) {
-//          lowest_mse = error_val
-//          curr_best_offspring = offspring_cgp
-//        }
-//      }
-//      print("Error: ")
-//      print(lowest_mse)
-//      print(" in generation ")
-//      println(generation)
-//
-//      generation += 1
-//      parent_cgp = curr_best_offspring
-//    }
 
     def evaluate_CGP_against_points(cgp_to_eval: Cgp): Double = {
       val r = scala.util.Random
