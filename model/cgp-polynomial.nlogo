@@ -1,39 +1,94 @@
 extensions [cgp]
 
-to generate-point
-  let points cgp:rand-point num-point
-  show points
+turtles-own [mse pred-points predictions]
+
+to setup
+  clear-all
+  create-initial-cgps
+  reset-ticks
 end
 
-to true-value
-  let values cgp:true-value
-  show values
+to-report generate-points
+  let points []
+  repeat num-points [
+    ifelse random 100 < 50 [
+      set points lput (random-float 10) points
+    ]
+    [
+      set points lput (random-float -10) points
+    ]
+  ]
+  report points
 end
 
-to generate-cgp
-  let first-result cgp:init_cgp
-  show word "Best CGP #: " item 0 first-result
-  show word "Best evaluation score: " item 1 first-result
+to-report true-function [points]
+  let true-vals []
+  foreach points [
+    x ->
+    set true-vals lput ((x ^ 3) + x) true-vals
+  ]
+  report true-vals
 end
+
+to create-initial-cgps
+  create-turtles initial-num-cgps
+  ask turtles [
+    cgp:add-cgps 1 1 5 1 5
+  ]
+end
+
+to evaluate-cgps-against-points [points]
+  ask turtles [
+    set predictions []
+    set pred-points []
+    foreach points [
+      x ->
+      set predictions lput (cgp:get-action x) predictions
+      set pred-points lput x pred-points
+    ]
+    let true-vals true-function points
+    let i 0
+    let ongoing-error 0
+    while [i < length true-vals]
+    [
+      set ongoing-error ( ongoing-error + (abs ((item i true-vals) - (item i predictions)) ) )
+      set i i + 1
+    ]
+
+    set mse (ongoing-error / num-points)
+  ]
+end
+
+to make-offspring
+  let parents (turtles with-min [mse])
+  let parent one-of parents
+  show [mse] of parent
+  ask turtles with [who != [who] of parent] [
+   cgp:clear-cgp
+   die
+  ]
+  create-turtles num-offspring
+  ask turtles [
+    cgp:mutate-reproduce parent 0.05
+  ]
+end
+
 
 to go
-  let iter 0
-  let eval-score 0
-  while [iter < num-generation and eval-score > 100] [
-    set iter iter + 1
-    set eval-score cgp:mutate_breed mutation-rate
-    show word "Score: " eval-score
-  ]
+  make-offspring
+  let points generate-points
+  evaluate-cgps-against-points points
+  tick
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-236
-10
-673
-448
+694
+58
+867
+232
 -1
 -1
-13.0
+5.0
 1
 10
 1
@@ -47,90 +102,96 @@ GRAPHICS-WINDOW
 16
 -16
 16
-0
-0
+1
+1
 1
 ticks
 30.0
 
-BUTTON
-108
-18
-223
-51
-NIL
-generate-point
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-INPUTBOX
-18
-16
-100
-91
-num-point
+PLOT
+301
+55
+602
+369
+Estimation
+Inputs
+Outputs
+-10.0
+10.0
+-100.0
 100.0
+true
+true
+"" ""
+PENS
+"points" 1.0 2 -16777216 true "let i 0 \nlet points generate-points\nlet true-vals true-function points\nwhile [i < (length points)] [\n  plotxy (item i points) (item i true-vals)\n  set i i + 1\n]" ""
+"CGP" 1.0 2 -2674135 true "plot-pen-reset" "plot-pen-reset\nlet best-turtle (min-one-of turtles [mse])\nlet points ([pred-points] of best-turtle)\nlet best-predictions ([predictions] of best-turtle)\nlet i 0\nwhile [i < (length points)] [\n  plotxy (item i points) (item i best-predictions)\n  set i i + 1\n]"
+
+SLIDER
+2
+58
+174
+91
+initial-num-cgps
+initial-num-cgps
 1
+100
+15.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+3
+104
+175
+137
+num-points
+num-points
+1
+1000
+501.0
+10
+1
+NIL
+HORIZONTAL
+
+SLIDER
+4
+149
+176
+182
+num-offspring
+num-offspring
+1
+100
+50.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+7
+190
+179
+223
+mutation-rate
+mutation-rate
 0
-Number
+20
+0.05
+0.01
+1
+NIL
+HORIZONTAL
 
 BUTTON
-108
-56
-224
-89
-NIL
-true-value
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-BUTTON
-126
-130
-224
-163
-NIL
-generate-cgp
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-INPUTBOX
-18
-198
-141
-258
-num-generation
-10000.0
-1
-0
-Number
-
-BUTTON
-151
-210
-219
-243
+55
+295
+118
+328
 NIL
 go
 T
@@ -143,18 +204,34 @@ NIL
 NIL
 1
 
-INPUTBOX
-18
-119
+BUTTON
+54
+248
 120
-179
-mutation-rate
-0.05
+281
+NIL
+setup
+NIL
 1
-0
-Number
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
 
 @#$#@#$#@
+## ORDER 
+
+First do create-initial-cgps to make the first generation
+Evaluate CGPs against points to that they get MSEs 
+
+
+go method runs 
+	- make offspring
+	- evaluates-cgps-against-points
+
 ## WHAT IS IT?
 
 (a general understanding of what the model is trying to show or explain)
