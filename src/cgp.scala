@@ -7,6 +7,7 @@ import org.nlogo.core.AgentKind
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.math.BigDecimal.double2bigDecimal
+import scala.math.abs
 import scala.util.Random
 
 class cgp extends api.DefaultClassManager {
@@ -81,7 +82,7 @@ class cgp extends api.DefaultClassManager {
         /////// create nodes with linkage back to any of the nodes
         var last_node_number_in_column = this.num_inputs - 1
         var row_counter = 1
-        for (i <- this.num_inputs to (this.num_rows * this.num_cols)) {
+        for (i <- this.num_inputs to (this.num_inputs + (this.num_rows * this.num_cols) - 1)) {
           var incoming1 = 0
           var incoming2 = 0
           if (last_node_number_in_column > 0) {
@@ -101,6 +102,8 @@ class cgp extends api.DefaultClassManager {
         this.OutputConnection = r.nextInt(this.num_inputs + (this.num_rows*this.num_cols) - 1)
       }
 
+      //
+
       /////////////////////////
       ///// Finds Active Nodes ///////
       /////////////////////////
@@ -115,7 +118,8 @@ class cgp extends api.DefaultClassManager {
         if (this.OutputConnection < this.num_inputs) {
           return
         }
-
+        print("Outputconnection - num_inputs is ")
+        println(this.OutputConnection - this.num_inputs)
         // Set first linkage from output node to graph to be true
         this.ActiveNodes(this.OutputConnection - this.num_inputs) = true
 
@@ -128,6 +132,8 @@ class cgp extends api.DefaultClassManager {
         if (node_number < this.num_inputs) {
           return
         }
+
+        // Recurse on incoming edges and set to true
         if (this.node_list(node_number - this.num_inputs).Incoming1 >= this.num_inputs) {
           this.ActiveNodes(this.node_list(node_number - this.num_inputs).Incoming1 - this.num_inputs) = true
         }
@@ -141,10 +147,13 @@ class cgp extends api.DefaultClassManager {
       /////////////////////////
       ///// Solves CGP ///////
       /////////////////////////
-      def decode_cgp(input_value: Double): Double = {
+      def decode_cgp(input_values: List[Double]): List[Double] = {
         // if all active nodes are false, then just return the input value
         if (!this.ActiveNodes.contains(true)) {
-          return input_value
+          //////// change here
+          // should return what the output node maps to instead of just input values
+          return List(input_values(this.OutputConnection))
+          return input_values
         }
 
         var NodeOutput = ListBuffer[Double]()
@@ -154,112 +163,92 @@ class cgp extends api.DefaultClassManager {
           NodeOutput += 0.0
         }
 
-        // Set input values
-        NodeOutput(0) = input_value
-
+        // Set input values to begin with
+        for (input_idx <- 0 to input_values.length-1) {
+          NodeOutput(input_idx) = input_values(input_idx)
+        }
         for (active_node_idx <- 0 to ActiveNodes.length-1) {
           if (ActiveNodes(active_node_idx) == true) {
             // If active node is true, then compute the function at the node with its incoming edges
-            var function_to_apply = this.node_list(active_node_idx + this.num_inputs).func_idx
+            var function_to_apply = this.node_list(active_node_idx).func_idx
             var computed_val = 0.0
             if (function_to_apply == 0) {
-              computed_val = funcs.add(NodeOutput(this.node_list(active_node_idx + this.num_inputs).Incoming1), NodeOutput(this.node_list(active_node_idx + this.num_inputs).Incoming2))
+              computed_val = funcs.add(NodeOutput(this.node_list(active_node_idx).Incoming1), NodeOutput(this.node_list(active_node_idx).Incoming2))
             }
             else if (function_to_apply == 1) {
-              computed_val = funcs.subtract(NodeOutput(this.node_list(active_node_idx + this.num_inputs).Incoming1), NodeOutput(this.node_list(active_node_idx + this.num_inputs).Incoming2))
+              computed_val = funcs.subtract(NodeOutput(this.node_list(active_node_idx).Incoming1), NodeOutput(this.node_list(active_node_idx).Incoming2))
             }
             else if (function_to_apply == 2) {
-              computed_val = funcs.multiply(NodeOutput(this.node_list(active_node_idx + this.num_inputs).Incoming1), NodeOutput(this.node_list(active_node_idx + this.num_inputs).Incoming2))
+              computed_val = funcs.multiply(NodeOutput(this.node_list(active_node_idx).Incoming1), NodeOutput(this.node_list(active_node_idx).Incoming2))
             }
             else {
-              computed_val = funcs.divide(NodeOutput(this.node_list(active_node_idx + this.num_inputs).Incoming1), NodeOutput(this.node_list(active_node_idx + this.num_inputs).Incoming2))
+              computed_val = funcs.divide(NodeOutput(this.node_list(active_node_idx).Incoming1), NodeOutput(this.node_list(active_node_idx).Incoming2))
             }
             NodeOutput(active_node_idx + this.num_inputs) = computed_val
           }
         }
-        return NodeOutput(this.OutputConnection)
+        return List(NodeOutput(this.OutputConnection))
       }
     } // end of CGP class
 
-    /////////////////////////
-    ///// mutates CGP ///////
-    /////////////////////////
-    def mutate_cgp(parent_cgp: Cgp, mutation_rate: Double): Cgp = {
-      // deep copy CGP
-      var mutated_cgp = new Cgp(parent_cgp.num_inputs, parent_cgp.num_outputs, parent_cgp.lvls_back, parent_cgp.num_rows, parent_cgp.num_cols)
-      var node_list_copied = ListBuffer[Node]()
-      for (node <- parent_cgp.node_list) {
-        var copied_node = new Node(node.number, node.func_idx, node.Incoming1, node.Incoming2)
-        node_list_copied += copied_node
-      }
-      mutated_cgp.set_node_list(node_list_copied)
-      mutated_cgp.set_output_connection(parent_cgp.OutputConnection)
-
-      val r = scala.util.Random
-
-      // remake nodes by certain probability
-      var flag_changed = false
-      while (flag_changed == false) {
-        var last_node_number_in_column = mutated_cgp.num_inputs - 1
-        var row_counter = 1
-        for (node_idx <- 0 to (mutated_cgp.node_list.length - 1) + mutated_cgp.num_outputs) {
-          if (node_idx > mutated_cgp.node_list.length - 1) {
-            val prob = r.nextDouble * 100
-            if (prob <= mutation_rate) {
-              flag_changed = true
-              mutated_cgp.OutputConnection = r.nextInt(mutated_cgp.num_inputs + (mutated_cgp.num_rows*mutated_cgp.num_cols) - 1)
-            }
-          }
-          else {
-            var node = mutated_cgp.node_list(node_idx)
-            val prob = r.nextDouble * 100
-            if (prob <= mutation_rate) {
-              flag_changed = true // mark that a change was made
-              // alter an entire node (alter incoming edges and function)
-              node.set_func_idx(r.nextInt(3))
-              if (last_node_number_in_column > 0) {
-                node.set_incoming_node_1(r.nextInt(last_node_number_in_column))
-                node.set_incoming_node_2(r.nextInt(last_node_number_in_column))
-              }
-            }
-          }
-          if (row_counter % mutated_cgp.num_rows == 0) {
-            last_node_number_in_column = node_idx + 1
-            row_counter = 0
-          }
-          row_counter += 1
-        }
-      }
-
-      // compute active nodes
-      mutated_cgp.find_active_nodes()
-      return mutated_cgp
+  /////////////////////////
+  ///// mutates CGP ///////
+  /////////////////////////
+  def mutate_cgp(parent_cgp: Cgp, mutation_rate: Double): Cgp = {
+    // deep copy CGP
+    var mutated_cgp = new Cgp(parent_cgp.num_inputs, parent_cgp.num_outputs, parent_cgp.lvls_back, parent_cgp.num_rows, parent_cgp.num_cols)
+    var node_list_copied = ListBuffer[Node]()
+    for (node <- parent_cgp.node_list) {
+      var copied_node = new Node(node.number, node.func_idx, node.Incoming1, node.Incoming2)
+      node_list_copied += copied_node
     }
+    mutated_cgp.set_node_list(node_list_copied)
+    mutated_cgp.set_output_connection(parent_cgp.OutputConnection)
+
+    val r = scala.util.Random
+
+    // remake nodes by certain probability
+    var flag_changed = false
+    while (flag_changed == false) {
+      var last_node_number_in_column = mutated_cgp.num_inputs - 1
+      var row_counter = 1
+      for (node_idx <- 0 to (mutated_cgp.node_list.length - 1) + mutated_cgp.num_outputs) {
+        if (node_idx > mutated_cgp.node_list.length - 1) {
+          val prob = r.nextDouble * 100
+          if (prob <= mutation_rate) {
+            flag_changed = true
+            mutated_cgp.OutputConnection = r.nextInt(mutated_cgp.num_inputs + (mutated_cgp.num_rows*mutated_cgp.num_cols) - 1)
+          }
+        }
+        else {
+          var node = mutated_cgp.node_list(node_idx)
+          val prob = r.nextDouble * 100
+          if (prob <= mutation_rate) {
+            flag_changed = true // mark that a change was made
+            // alter an entire node (alter incoming edges and function)
+            node.set_func_idx(r.nextInt(3))
+            if (last_node_number_in_column > 0) {
+              node.set_incoming_node_1(r.nextInt(last_node_number_in_column))
+              node.set_incoming_node_2(r.nextInt(last_node_number_in_column))
+            }
+          }
+        }
+        if (row_counter % mutated_cgp.num_rows == 0) {
+          last_node_number_in_column = node_idx + 1
+          row_counter = 0
+        }
+        row_counter += 1
+      }
+    }
+
+    // compute active nodes
+    mutated_cgp.find_active_nodes()
+    return mutated_cgp
+  }
 
     def func_to_eval(point: Double): Double = {
       (point * point * point) + point
     }
-
-    def evaluate_CGP_against_points(cgp_to_eval: Cgp): Double = {
-      val r = scala.util.Random
-      var ongoing_error = 0.0
-
-      for (i <- 1 to 500) {
-        // half the time negative and positive
-        if (r.nextDouble <= 50) {
-          var point = r.nextDouble * 10
-          var evaluation = cgp_to_eval.decode_cgp(point)
-          ongoing_error += (func_to_eval(point) - evaluation) * (func_to_eval(point) - evaluation)
-        }
-        else {
-          var point = r.nextDouble * -10
-          var evaluation = cgp_to_eval.decode_cgp(point)
-          ongoing_error += (func_to_eval(point) - evaluation) * (func_to_eval(point) - evaluation)
-        }
-      }
-      return ongoing_error / 500
-    }
-
 
   /*******************************************************************************
   **************************NETLOGO PORTION***************************************
@@ -310,9 +299,10 @@ class cgp extends api.DefaultClassManager {
       Syntax.reporterSyntax(right = List(Syntax.ListType), ret = Syntax.ListType, agentClassString = "-T--")
 
     def report(args: Array[Argument], context: Context): AnyRef = {
-      var input_points_nlogo = args(0).getDoubleValue
+      var input_points_nlogo = args(0).getList.toList.map(_.toString.toDouble)
       var action_probs = turtlesToCgps(context.getAgent.asInstanceOf[api.Turtle]).decode_cgp(input_points_nlogo)
-      return action_probs.asInstanceOf[AnyRef]
+      return action_probs.toLogoList
+//      return action_probs.asInstanceOf[AnyRef]
     }
   }
 
