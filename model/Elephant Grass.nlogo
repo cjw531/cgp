@@ -16,7 +16,7 @@ to setup
     set shape "elephant"
     set size 4.5
     set energy 100
-    cgp:add-cgps 9 1 12 12 12 ;; inputs outputs lvls rows cols
+    cgp:add-cgps 9 3 10 10 10 ;; inputs outputs lvls rows cols
     set age 1
   ]
 
@@ -37,55 +37,64 @@ to go
   ask elephants [
     let obs get-observations
     let action-vector cgp:get-action obs
-    show action-vector
+    ;; format action-vector to be probabilities
+    set action-vector (map abs action-vector)
+    let total (sum action-vector)
+    ifelse total > 0 [
+      set action-vector (map [i -> i / total] action-vector)
+    ]
+    [
+      set action-vector (map [i -> i * 0] action-vector)
+    ]
+;    show action-vector
 
-;    ifelse action-vector = (list 0 0 0)
-;    [
-;      let action one-of [1 2 3]
-;      if action = 1 [
-;        fd 0.5
-;        set energy energy - 1
-;      ]
-;      if action = 2 [
-;        lt 20
-;        set energy energy - 0.5
-;      ]
-;      if action = 3 [
-;        rt 20
-;        set energy energy - 0.5
-;      ]
-;    ]
-;    [
-;      ;; get cumulative sums
-;      let cum-sum (list)
-;      set cum-sum lput (item 0 action-vector) cum-sum
-;      set cum-sum lput (item 0 action-vector + item 1 action-vector) cum-sum
-;      set cum-sum lput (item 1 cum-sum + item 2 action-vector) cum-sum
-;
-;;      show action-vector
-;
-;      let n random-float sum action-vector
-;
-;      (ifelse n < (item 0 cum-sum) [
-;        ;; do first action
-;        fd 0.2
-;        set energy energy - 1
-;      ]
-;      n < (item 1 cum-sum) [
-;        ;; do second action
-;        lt 20
-;        set energy energy - 0.5
-;      ]
-;      n <= (item 2 cum-sum) [
-;        ;; do third action
-;        rt 20
-;        set energy energy - 0.5
-;      ]
-;      [
-;        ;; else should never come here
-;          print "Should not be here"
-;      ])
-    ;]
+    ifelse action-vector = (list 0 0 0)
+    [
+      let action one-of [1 2 3]
+      if action = 1 [
+        fd 0.5
+        set energy energy - 0.5
+      ]
+      if action = 2 [
+        lt 20
+        set energy energy - 0.1
+      ]
+      if action = 3 [
+        rt 20
+        set energy energy - 0.1
+      ]
+    ]
+    [
+      ;; get cumulative sums
+      let cum-sum (list)
+      set cum-sum lput (item 0 action-vector) cum-sum
+      set cum-sum lput (item 0 action-vector + item 1 action-vector) cum-sum
+      set cum-sum lput (item 1 cum-sum + item 2 action-vector) cum-sum
+
+;      show action-vector
+
+      let n random-float sum action-vector
+
+      (ifelse n < (item 0 cum-sum) [
+        ;; do first action
+        fd 0.2
+        set energy energy - 1
+      ]
+      n < (item 1 cum-sum) [
+        ;; do second action
+        lt 20
+        set energy energy - 0.5
+      ]
+      n <= (item 2 cum-sum) [
+        ;; do third action
+        rt 20
+        set energy energy - 0.5
+      ]
+      [
+        ;; else should never come here
+          print "Should not be here"
+      ])
+    ]
     eat
     reproduce
     check-death
@@ -163,7 +172,7 @@ end
 
 to reproduce
   ;; in here, mutate to generate an offspring
-  if random-float 100 < busses-reproduce and energy > 100[  ; throw "dice" to see if you will reproduce
+  if energy > 200 [
     set energy (energy / 2)               ; divide energy between parent and offspring
     hatch 1 [
       rt random-float 360 fd 1
@@ -249,7 +258,7 @@ num-elephants
 num-elephants
 0
 100
-9.0
+35.0
 1
 1
 NIL
@@ -297,7 +306,7 @@ grass-regrowth-time
 grass-regrowth-time
 100
 1000
-120.0
+150.0
 10
 1
 NIL
@@ -323,7 +332,7 @@ busses-reproduce
 busses-reproduce
 0
 100
-5.0
+2.0
 1
 1
 NIL
@@ -336,9 +345,9 @@ SLIDER
 49
 max-age
 max-age
-500
-2000
-1010.0
+100
+1000
+450.0
 10
 1
 NIL

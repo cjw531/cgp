@@ -52,150 +52,161 @@ class cgp extends api.DefaultClassManager {
 
     }
 
-    class Cgp(num_inputs_i: Int, num_outputs_i: Int, lvls_back_i: Int, num_rows_i: Int, num_cols_i: Int) {
-      val arity = 2
-      val num_inputs = num_inputs_i
-      val num_outputs = num_outputs_i
-      val lvls_back = lvls_back_i
-      val num_rows = num_rows_i
-      val num_cols = num_cols_i
-      val graph = ListBuffer[Node]()
-      val funcs = new Functions()
-      var node_list = ListBuffer[Node]()
-      var OutputConnection = -1
-      val r = scala.util.Random
-      var ActiveNodes = ListBuffer[Boolean]()
+  class Cgp(num_inputs_i: Int, num_outputs_i: Int, lvls_back_i: Int, num_rows_i: Int, num_cols_i: Int) {
+    val arity = 2
+    val num_inputs = num_inputs_i
+    val num_outputs = num_outputs_i
+    val lvls_back = lvls_back_i
+    val num_rows = num_rows_i
+    val num_cols = num_cols_i
+    val graph = ListBuffer[Node]()
+    val funcs = new Functions()
+    var node_list = ListBuffer[Node]()
+    var OutputConnections = ListBuffer[Int]()
+    val r = scala.util.Random
+    var ActiveNodes = ListBuffer[Boolean]()
+    def set_node_list(new_node_list: ListBuffer[Node]): Unit = {
+      this.node_list = new_node_list
+    }
+    def set_output_connection(new_output_connection: Int, idx_to_change: Int): Unit = {
+      this.OutputConnections(idx_to_change) = new_output_connection
+    }
+    def add_to_output_connections(node_num_to_add: Int): Unit = {
+      OutputConnections += node_num_to_add
+    }
 
-      def set_node_list(new_node_list: ListBuffer[Node]): Unit = {
-        this.node_list = new_node_list
+    /////////////////////////
+    ///// Creates CGP ///////
+    /////////////////////////
+    def create_cgp(): Unit = {
+      // make graph
+      /////// create nodes with linkage back to any of the nodes
+      var last_node_number_in_column = this.num_inputs - 1
+      var row_counter = 1
+      for (i <- this.num_inputs to (this.num_inputs + (this.num_rows * this.num_cols) - 1)) {
+        var incoming1 = 0
+        var incoming2 = 0
+        if (last_node_number_in_column > 0) {
+          incoming1 = r.nextInt(last_node_number_in_column) // pick random node before it
+          incoming2 = r.nextInt(last_node_number_in_column)
+        }
+        var new_node = new Node(i, r.nextInt(funcs.total_funcs), incoming1, incoming2)
+        this.node_list += new_node
+        if (row_counter % this.num_rows == 0) {
+          last_node_number_in_column = i
+          println(last_node_number_in_column)
+          row_counter = 0
+        }
+        row_counter += 1
+      }
+      // connect outputs to any previous nodes
+      for (i <- (this.num_inputs + (this.num_rows * this.num_cols)) to (this.num_inputs + (this.num_rows * this.num_cols) + this.num_outputs - 1)) {
+        this.OutputConnections += r.nextInt(this.num_inputs + (this.num_rows*this.num_cols) - 1)
+      }
+    }
+
+    //
+
+    /////////////////////////
+    ///// Finds Active Nodes ///////
+    /////////////////////////
+    def find_active_nodes(): Unit = {
+
+      // Instantiate active nodes array with all false to start with
+      for (i <- 0 to (this.num_rows*this.num_cols)-1) {
+        this.ActiveNodes += false
+      }
+      // Set first linkages from output nodes to graph to be true
+      for (output_node <- this.OutputConnections) {
+        if (output_node >= this.num_inputs) {
+          this.ActiveNodes(output_node - this.num_inputs) = true
+        }
       }
 
-      def set_output_connection(new_output_connection: Int): Unit = {
-        this.OutputConnection = new_output_connection
+      // Follow path to set all active nodes to be true
+      for (output_node <- this.OutputConnections) {
+        if (output_node >= this.num_inputs) {
+          find_active_nodes_helper(output_node)
+        }
+      }
+    } // end of Find Active Nodes
+
+    def find_active_nodes_helper(node_number: Int): Unit = {
+      // Base case: If an input node, then has ended path
+      if (node_number < this.num_inputs) {
+        return
       }
 
-      /////////////////////////
-      ///// Creates CGP ///////
-      /////////////////////////
-      def create_cgp(): Unit = {
-        // make graph
-        /////// create nodes with linkage back to any of the nodes
-        var last_node_number_in_column = this.num_inputs - 1
-        var row_counter = 1
-        for (i <- this.num_inputs to (this.num_inputs + (this.num_rows * this.num_cols) - 1)) {
-          var incoming1 = 0
-          var incoming2 = 0
-          if (last_node_number_in_column > 0) {
-            incoming1 = r.nextInt(last_node_number_in_column) // pick random node before it
-            incoming2 = r.nextInt(last_node_number_in_column)
+      // Recurse on incoming edges and set to true
+      if (this.node_list(node_number - this.num_inputs).Incoming1 >= this.num_inputs) {
+        this.ActiveNodes(this.node_list(node_number - this.num_inputs).Incoming1 - this.num_inputs) = true
+      }
+      if (this.node_list(node_number - this.num_inputs).Incoming2 >= this.num_inputs) {
+        this.ActiveNodes(this.node_list(node_number - this.num_inputs).Incoming2 - this.num_inputs) = true
+      }
+      find_active_nodes_helper(this.node_list(node_number - this.num_inputs).Incoming1)
+      find_active_nodes_helper(this.node_list(node_number - this.num_inputs).Incoming2)
+    } // end of recursive helper function
+
+    /////////////////////////
+    ///// Solves CGP ///////
+    /////////////////////////
+    def decode_cgp(input_values: List[Double]): List[Double] = {
+      // if all active nodes are false, then just return the input value
+      if (!this.ActiveNodes.contains(true)) {
+        var result = ListBuffer[Double]()
+        for (output_node <- this.OutputConnections) {
+          result += input_values(output_node)
+        }
+        return result.toList
+      }
+
+      var NodeOutput = ListBuffer[Double]()
+
+      // Set all 0's to start with
+      for (i <- 0 to (this.num_inputs + (this.num_rows*this.num_cols) - 1)) {
+        NodeOutput += 0.0
+      }
+
+      // Set input values to begin with
+      for (input_idx <- 0 to input_values.length-1) {
+        NodeOutput(input_idx) = input_values(input_idx)
+      }
+      for (active_node_idx <- 0 to ActiveNodes.length-1) {
+        if (ActiveNodes(active_node_idx) == true) {
+          // If active node is true, then compute the function at the node with its incoming edges
+          var function_to_apply = this.node_list(active_node_idx).func_idx
+          var computed_val = 0.0
+          if (function_to_apply == 0) {
+            computed_val = funcs.add(NodeOutput(this.node_list(active_node_idx).Incoming1), NodeOutput(this.node_list(active_node_idx).Incoming2))
           }
-          var new_node = new Node(i, r.nextInt(funcs.total_funcs), incoming1, incoming2)
-          this.node_list += new_node
-          if (row_counter % this.num_rows == 0) {
-            last_node_number_in_column = i
-            println(last_node_number_in_column)
-            row_counter = 0
+          else if (function_to_apply == 1) {
+            computed_val = funcs.subtract(NodeOutput(this.node_list(active_node_idx).Incoming1), NodeOutput(this.node_list(active_node_idx).Incoming2))
           }
-          row_counter += 1
-        }
-        // connect output to any previous nodes
-        this.OutputConnection = r.nextInt(this.num_inputs + (this.num_rows*this.num_cols) - 1)
-      }
-
-      //
-
-      /////////////////////////
-      ///// Finds Active Nodes ///////
-      /////////////////////////
-      def find_active_nodes(): Unit = {
-
-        // Instantiate active nodes array with all false to start with
-        for (i <- 0 to (this.num_rows*this.num_cols)-1) {
-          this.ActiveNodes += false
-        }
-
-        // If the output node connects straight to an input then they are all false
-        if (this.OutputConnection < this.num_inputs) {
-          return
-        }
-        print("Outputconnection - num_inputs is ")
-        println(this.OutputConnection - this.num_inputs)
-        // Set first linkage from output node to graph to be true
-        this.ActiveNodes(this.OutputConnection - this.num_inputs) = true
-
-        // Follow path to set all active nodes to be true
-        find_active_nodes_helper(this.OutputConnection)
-      } // end of Find Active Nodes
-
-      def find_active_nodes_helper(node_number: Int): Unit = {
-        // Base case: If an input node, then has ended path
-        if (node_number < this.num_inputs) {
-          return
-        }
-
-        // Recurse on incoming edges and set to true
-        if (this.node_list(node_number - this.num_inputs).Incoming1 >= this.num_inputs) {
-          this.ActiveNodes(this.node_list(node_number - this.num_inputs).Incoming1 - this.num_inputs) = true
-        }
-        if (this.node_list(node_number - this.num_inputs).Incoming2 >= this.num_inputs) {
-          this.ActiveNodes(this.node_list(node_number - this.num_inputs).Incoming2 - this.num_inputs) = true
-        }
-        find_active_nodes_helper(this.node_list(node_number - this.num_inputs).Incoming1)
-        find_active_nodes_helper(this.node_list(node_number - this.num_inputs).Incoming2)
-      } // end of recursive helper function
-
-      /////////////////////////
-      ///// Solves CGP ///////
-      /////////////////////////
-      def decode_cgp(input_values: List[Double]): List[Double] = {
-        // if all active nodes are false, then just return the input value
-        if (!this.ActiveNodes.contains(true)) {
-          //////// change here
-          // should return what the output node maps to instead of just input values
-          return List(input_values(this.OutputConnection))
-          return input_values
-        }
-
-        var NodeOutput = ListBuffer[Double]()
-
-        // Set all 0's to start with
-        for (i <- 0 to (this.num_inputs + (this.num_rows*this.num_cols) - 1)) {
-          NodeOutput += 0.0
-        }
-
-        // Set input values to begin with
-        for (input_idx <- 0 to input_values.length-1) {
-          NodeOutput(input_idx) = input_values(input_idx)
-        }
-        for (active_node_idx <- 0 to ActiveNodes.length-1) {
-          if (ActiveNodes(active_node_idx) == true) {
-            // If active node is true, then compute the function at the node with its incoming edges
-            var function_to_apply = this.node_list(active_node_idx).func_idx
-            var computed_val = 0.0
-            if (function_to_apply == 0) {
-              computed_val = funcs.add(NodeOutput(this.node_list(active_node_idx).Incoming1), NodeOutput(this.node_list(active_node_idx).Incoming2))
-            }
-            else if (function_to_apply == 1) {
-              computed_val = funcs.subtract(NodeOutput(this.node_list(active_node_idx).Incoming1), NodeOutput(this.node_list(active_node_idx).Incoming2))
-            }
-            else if (function_to_apply == 2) {
-              computed_val = funcs.multiply(NodeOutput(this.node_list(active_node_idx).Incoming1), NodeOutput(this.node_list(active_node_idx).Incoming2))
-            }
-            else {
-              computed_val = funcs.divide(NodeOutput(this.node_list(active_node_idx).Incoming1), NodeOutput(this.node_list(active_node_idx).Incoming2))
-            }
-            NodeOutput(active_node_idx + this.num_inputs) = computed_val
+          else if (function_to_apply == 2) {
+            computed_val = funcs.multiply(NodeOutput(this.node_list(active_node_idx).Incoming1), NodeOutput(this.node_list(active_node_idx).Incoming2))
           }
+          else {
+            computed_val = funcs.divide(NodeOutput(this.node_list(active_node_idx).Incoming1), NodeOutput(this.node_list(active_node_idx).Incoming2))
+          }
+          NodeOutput(active_node_idx + this.num_inputs) = computed_val
         }
-        return List(NodeOutput(this.OutputConnection))
       }
-    } // end of CGP class
+      var result = ListBuffer[Double]()
+      for (output_node <- this.OutputConnections) {
+        result += NodeOutput(output_node)
+      }
+      return result.toList
+    }
+  } // end of CGP class
 
   /////////////////////////
   ///// mutates CGP ///////
   /////////////////////////
   def mutate_cgp(parent_cgp: Cgp, mutation_rate: Double): Cgp = {
     // deep copy CGP
+    print("Num Outputs: ")
+    println(parent_cgp.num_outputs)
     var mutated_cgp = new Cgp(parent_cgp.num_inputs, parent_cgp.num_outputs, parent_cgp.lvls_back, parent_cgp.num_rows, parent_cgp.num_cols)
     var node_list_copied = ListBuffer[Node]()
     for (node <- parent_cgp.node_list) {
@@ -203,7 +214,9 @@ class cgp extends api.DefaultClassManager {
       node_list_copied += copied_node
     }
     mutated_cgp.set_node_list(node_list_copied)
-    mutated_cgp.set_output_connection(parent_cgp.OutputConnection)
+    for (output_node <- parent_cgp.OutputConnections) {
+      mutated_cgp.add_to_output_connections(output_node)
+    }
 
     val r = scala.util.Random
 
@@ -213,11 +226,13 @@ class cgp extends api.DefaultClassManager {
       var last_node_number_in_column = mutated_cgp.num_inputs - 1
       var row_counter = 1
       for (node_idx <- 0 to (mutated_cgp.node_list.length - 1) + mutated_cgp.num_outputs) {
+        //        println(node_idx)
         if (node_idx > mutated_cgp.node_list.length - 1) {
+          var output_idx = node_idx - mutated_cgp.node_list.length
           val prob = r.nextDouble * 100
           if (prob <= mutation_rate) {
             flag_changed = true
-            mutated_cgp.OutputConnection = r.nextInt(mutated_cgp.num_inputs + (mutated_cgp.num_rows*mutated_cgp.num_cols) - 1)
+            mutated_cgp.set_output_connection(r.nextInt(mutated_cgp.num_inputs + (mutated_cgp.num_rows*mutated_cgp.num_cols) - 1), output_idx)
           }
         }
         else {

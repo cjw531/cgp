@@ -33,7 +33,7 @@ end
 to create-initial-cgps
   create-turtles initial-num-cgps
   ask turtles [
-    cgp:add-cgps 2 1 5 1 5 ; inputs outputs lvls_back rows cols
+    cgp:add-cgps 2 5 5 10 10 ; inputs outputs lvls_back rows cols
   ]
 end
 
