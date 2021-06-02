@@ -13,7 +13,7 @@ import scala.util.Random
 class cgp extends api.DefaultClassManager {
 
     class Functions() {
-      val total_funcs = 4
+      val total_funcs = 7
 
       def add (x: Double, y: Double): Double = {
         x + y
@@ -29,6 +29,26 @@ class cgp extends api.DefaultClassManager {
           return 0
         }
         return (x / y)
+      }
+      def constant(x: Double, y:Double): Double = {
+        return 1.0
+      }
+      def both_positive(x: Double, y: Double): Double = {
+        if (x > 0 && y > 0) {
+          return 1.0
+        }
+        else {
+          return 0.0
+        }
+      }
+
+      def greater_than(x: Double, y:Double): Double = {
+        if (x >= y) {
+          return 1.0
+        }
+        else {
+          return 0.0
+        }
       }
     }
 
@@ -186,8 +206,17 @@ class cgp extends api.DefaultClassManager {
           else if (function_to_apply == 2) {
             computed_val = funcs.multiply(NodeOutput(this.node_list(active_node_idx).Incoming1), NodeOutput(this.node_list(active_node_idx).Incoming2))
           }
-          else {
+          else if (function_to_apply == 3) {
             computed_val = funcs.divide(NodeOutput(this.node_list(active_node_idx).Incoming1), NodeOutput(this.node_list(active_node_idx).Incoming2))
+          }
+          else if (function_to_apply == 4) {
+            computed_val = funcs.constant(NodeOutput(this.node_list(active_node_idx).Incoming1), NodeOutput(this.node_list(active_node_idx).Incoming2))
+          }
+          else if (function_to_apply == 5) {
+            computed_val = funcs.both_positive(NodeOutput(this.node_list(active_node_idx).Incoming1), NodeOutput(this.node_list(active_node_idx).Incoming2))
+          }
+          else {
+            computed_val = funcs.greater_than(NodeOutput(this.node_list(active_node_idx).Incoming1), NodeOutput(this.node_list(active_node_idx).Incoming2))
           }
           NodeOutput(active_node_idx + this.num_inputs) = computed_val
         }
