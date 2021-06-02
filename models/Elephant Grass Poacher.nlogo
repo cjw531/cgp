@@ -24,6 +24,7 @@ to setup
     set energy 100
     cgp:add-cgps 21 3 4 12 12 ;; inputs outputs lvls rows cols
     set age 1
+    set heading 90
   ]
 
    create-poachers num-poachers [
@@ -33,16 +34,18 @@ to setup
     set size 3.0
     set economy 0
     cgp:add-cgps 21 3 2 4 4
+    set heading 0
   ]
 
-;  repeat num-rangers [
-;    ask one-of patches with [not any? rangers-here] [sprout-rangers 1 [
-;      set shape "ranger"
-;      set color blue
-;      set size 3.0
-;      ]
-;    ]
-;  ]
+  repeat num-rangers [
+    ask one-of patches with [not any? rangers-here] [sprout-rangers 1 [
+      set shape "ranger"
+      set color blue
+      set size 3.0
+      set heading 0
+      ]
+    ]
+  ]
   ask patches [
 ;    ifelse pxcor = 0 [ ];set pcolor black]
 ;    [
@@ -312,7 +315,7 @@ end
 
 to reproduce
   ;; in here, mutate to generate an offspring
-  if random-float 100 < busses-reproduce and energy > 100[  ; throw "dice" to see if you will reproduce
+  if random-float 100 < elephants-reproduce and energy > 100[  ; throw "dice" to see if you will reproduce
     set energy (energy / 2)               ; divide energy between parent and offspring
     hatch 1 [
       rt random-float 360 fd 1
@@ -362,10 +365,10 @@ to check-bankrupt
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-398
-13
-894
-510
+636
+18
+1132
+515
 -1
 -1
 14.8
@@ -438,10 +441,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-21
-55
-193
-88
+228
+13
+400
+46
 num-poachers
 num-poachers
 0
@@ -453,10 +456,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-21
-96
-193
-129
+408
+12
+580
+45
 num-rangers
 num-rangers
 0
@@ -468,10 +471,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-8
-142
-226
-175
+1
+93
+219
+126
 elephant-gain-from-food
 elephant-gain-from-food
 0
@@ -483,10 +486,10 @@ NIL
 HORIZONTAL
 
 PLOT
-135
-355
-378
-527
+166
+356
+418
+544
 Populations
 NIL
 NIL
@@ -498,14 +501,15 @@ true
 true
 "" ""
 PENS
-"elephants" 1.0 0 -16777216 true "" "plot count elephants"
-"poachers" 1.0 0 -7500403 true "" "plot count poachers"
+"elephants" 1.0 0 -3026479 true "" "plot count elephants"
+"poachers" 1.0 0 -16449023 true "" "plot count poachers"
+"rangers" 1.0 0 -13345367 true "" "plot count rangers"
 
 SLIDER
-18
-184
-203
-217
+15
+131
+200
+164
 grass-regrowth-time
 grass-regrowth-time
 100
@@ -517,10 +521,10 @@ NIL
 HORIZONTAL
 
 MONITOR
-31
-367
-119
-412
+98
+235
+186
+280
 max-energy
 max [energy] of elephants
 17
@@ -528,12 +532,12 @@ max [energy] of elephants
 11
 
 SLIDER
-23
-229
-195
-262
-busses-reproduce
-busses-reproduce
+13
+173
+198
+206
+elephants-reproduce
+elephants-reproduce
 0
 100
 5.0
@@ -543,10 +547,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-22
-267
-194
-300
+229
+52
+401
+85
 num-generation
 num-generation
 20
@@ -558,10 +562,10 @@ NIL
 HORIZONTAL
 
 MONITOR
-240
-127
-330
-172
+260
+169
+350
+214
 Generation
 generation
 17
@@ -569,10 +573,10 @@ generation
 11
 
 MONITOR
-42
-421
-114
-466
+38
+422
+110
+467
 Max Econ
 max [economy] of poachers
 17
@@ -580,10 +584,10 @@ max [economy] of poachers
 11
 
 SLIDER
-213
-234
-385
-267
+229
+90
+401
+123
 prob-set-trap
 prob-set-trap
 0
@@ -595,10 +599,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-213
-275
-385
-308
+229
+129
+401
+162
 trap-cooldown
 trap-cooldown
 20
@@ -610,10 +614,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-210
-16
-382
-49
+21
+52
+193
+85
 max-age
 max-age
 500
@@ -625,10 +629,10 @@ NIL
 HORIZONTAL
 
 MONITOR
-248
-71
-305
-116
+9
+235
+66
+280
 Age
 max [age] of elephants
 17
@@ -636,10 +640,10 @@ max [age] of elephants
 11
 
 SLIDER
-212
-191
-406
-224
+405
+279
+599
+312
 mutation-diff-percent
 mutation-diff-percent
 0
@@ -649,6 +653,17 @@ mutation-diff-percent
 1
 NIL
 HORIZONTAL
+
+SWITCH
+432
+321
+568
+354
+shoot-to-kill
+shoot-to-kill
+1
+1
+-1000
 
 @#$#@#$#@
 ## WHAT IS IT?
