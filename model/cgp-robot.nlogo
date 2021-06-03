@@ -1,22 +1,8 @@
-;;; TA COMMENTS
-
-;;; Your code is fine. But I have some big questions about the model here:
-
-;;; 1. Why does a robot get battery from delivering a package? How can battery be both a reward AND a part of the system ("I need to go charge.")
-;;; 2. Why do you need the CGP extension? If the CGP extension contains all of the agent cognition...then why do you need model?
-;;; 3. How do robots get their destinations?
-;;; 4. Why do you not have sliders for robot traits?
-;;; 5. Is battery your `fitness` now? If so, you should justify that. Especially since this could cause robots NOT moving
-;;;    to evolve (as that would preserve their battery possibly even more so than delivering the package). Not sure that this
-;;;    is what you meant to model.
-
-;;; A few smaller things below (search for ;;;)
-
 extensions [cgp]
 
-globals [generation count-pickup count-dropoff]
+globals [generation count-pickup count-dropoff location]
 
-turtles-own [battery action-reward fitness charging-tick is-charging]
+turtles-own [battery action-reward fitness charging-tick is-charging dist_package dist_destination]
 package-own [age]
 charger-own [age]
 
@@ -45,7 +31,9 @@ to setup
         set color green
         set charging-tick 0
         set fitness 0
-        cgp:add-cgps
+        set dist_package sqrt((14 - xcor) ^ 2)
+        set dist_destination sqrt((-16 - xcor) ^ 2)
+        cgp:add-cgps 9 3 2 5 5
       ]
     ]
   ]
@@ -118,7 +106,7 @@ to go
 
   ask package [
     set age age + 1
-    if age > 400 [die]
+    if age > tick-per-generation [die]
   ]
 
   ask charger [
@@ -180,19 +168,19 @@ end
 to action-score
   let pick one-of package-here ;; check for pick-up
   if pick != nobody [
-    ifelse color != orange [ ;; reward for pick up
+    if color != orange [ ;; reward for pick up
       ask pick [die]
-      set action-reward action-reward + 20
+      set action-reward action-reward + 5000
       set color orange
       set count-pickup count-pickup + 1
     ]
-    [ set action-reward action-reward - 5 ] ;; penalize if they try to hold 2 packages
+;    [ set action-reward action-reward - 1 ] ;; penalize if they try to hold 2 packages
   ]
 
   let destination patch-here ;; check if it is on drop-off area
   if destination != nobody and pcolor = 118 [
     ifelse color = orange [ ;; reward for delivering
-      set action-reward action-reward + 30
+      set action-reward action-reward + 30000
       set color green
       set count-dropoff count-dropoff + 1
     ]
@@ -201,7 +189,7 @@ to action-score
 
   let wall patch-here ;; check whether the robot is in wall
   if wall != nobody and pcolor = red [ ;; if bumped
-    set action-reward action-reward - 10
+    set action-reward action-reward - 5
     rt 180 ;; turn around
     fd 1 ;; move off from the wall
   ]
@@ -210,7 +198,19 @@ to action-score
   if charging != nobody and charging-tick = 0 [
     set charging-tick ceiling (tick-per-generation * 0.05) + 1 ;; hold for 5% time of each generation
     set battery 100
-    set action-reward action-reward + 5
+    set action-reward action-reward + 10
+  ]
+
+  let curr_dist_package sqrt((14 - xcor) ^ 2)
+  let curr_dist_destination sqrt((-16 - xcor) ^ 2)
+  ifelse color = orange [ ;; carrying item
+    (ifelse curr_dist_package < dist_package [ set action-reward action-reward +  50 ]
+      curr_dist_package = dist_package [ set action-reward action-reward - 30 ]
+    [ set action-reward action-reward - 50 ] )
+  ]
+  [ (ifelse curr_dist_destination < dist_destination [ set action-reward action-reward + 50 ]
+    curr_dist_destination = dist_destination [ set action-reward action-reward - 30 ]
+    [ set action-reward action-reward - 50 ])
   ]
 end
 
@@ -229,8 +229,6 @@ end
 
 to-report get-in-cone [dist angle]
   let obs []
-
-  ;;; Again, why are you using these magic cone numbers?
 
   let cone other turtles in-cone 7 20
   let front-patches patches in-cone 7 20
@@ -283,19 +281,6 @@ to create-new-items
   ]
 end
 
-
-;;; Is this directed reproduction? Or does it just happen to do this because of battery? Where is the fitness measured?
-
-;to reproduce
-;  if random-float 100 < num-reproduce and battery >= 80 [  ; throw "dice" to see if you will reproduce
-;    set battery (battery / 2)               ; divide battery between parent and offspring
-;    hatch 1 [
-;      rt random-float 360 fd 1
-;      cgp:mutate-reproduce myself 0.05
-;    ]  ; hatch an offspring and move it forward 1 step
-;  ]
-;end
-
 to reproduce
   if ticks mod tick-per-generation = 0 and ticks != 0 [ ;; in every num-generation tick
     set generation generation + 1
@@ -310,6 +295,7 @@ to reproduce
 
     repeat(initial-num-robot / 10) [
       let parent one-of (robot with-max [fitness])
+;      show [fitness] of parent
       repeat 10 [ ;; copy the robot software
         ask one-of patches with [not any? turtles-here
           and (pxcor != max-pxcor and pxcor != min-pxcor and pycor != max-pycor and pycor != min-pycor)] [
@@ -322,20 +308,13 @@ to reproduce
             set color green
             set charging-tick 0
             set fitness 0
-            cgp:mutate-reproduce parent 0.05 ;; mutation and reproduction rate, respectively
+            cgp:mutate-reproduce parent 0.05 9 3 2 5 5;; mutation and reproduction rate, respectively
           ]
         ]
       ]
       ask parent [die]
     ]
     ask robot with [color = red] [die] ;; kill the rest of them
-  ]
-end
-
-to print-cgps ;; testing purpose
-  ask robot [
-    let cgps cgp:get-cgp-list
-    show cgps
   ]
 end
 
@@ -453,7 +432,7 @@ PLOT
 282
 479
 548
-Population of Robot
+Population per Generation
 NIL
 NIL
 0.0
@@ -464,10 +443,8 @@ true
 true
 "" ""
 PENS
-"robot" 1.0 0 -16777216 true "" "plot count robot"
-"package" 1.0 0 -6459832 true "" "plot count package"
-"num-pickup" 1.0 0 -955883 true "" "plot count-pickup"
-"num-dropoff" 1.0 0 -11085214 true "" "plot count-dropoff"
+"num-pickup" 1.0 0 -955883 true "" "if ticks mod tick-per-generation = 0 and ticks != 0 [plot count-pickup]"
+"num-dropoff" 1.0 0 -11085214 true "" "if ticks mod tick-per-generation = 0 and ticks != 0 [plot count-dropoff]"
 
 MONITOR
 115
@@ -519,8 +496,8 @@ initial-num-package
 initial-num-package
 1
 100
-20.0
-1
+30.0
+10
 1
 NIL
 HORIZONTAL
@@ -552,61 +529,16 @@ generation
 15
 
 SLIDER
-272
-105
-483
-138
-num-wild-card-offspring
-num-wild-card-offspring
-1
-40
-2.0
-1
-1
-NIL
-HORIZONTAL
-
-SLIDER
-289
-65
-461
-98
-num-offspring
-num-offspring
-0
-50
-7.0
-1
-1
-NIL
-HORIZONTAL
-
-SLIDER
-278
-145
-450
-178
-num-reproduce
-num-reproduce
-0
-100
-13.0
-1
-1
-NIL
-HORIZONTAL
-
-SLIDER
 34
 144
 229
 177
 tick-per-generation
 tick-per-generation
+300
+1000
+500.0
 100
-500
-300.0
-10
 1
 NIL
 HORIZONTAL
