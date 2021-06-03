@@ -16,7 +16,7 @@ to setup
     set shape "elephant"
     set size 4.5
     set energy 100
-    cgp:add-cgps 9 3 10 10 10 ;; inputs outputs lvls rows cols
+    cgp:add-cgps 9 3 10 12 24 ;; inputs outputs lvls rows cols
     set age 1
   ]
 
@@ -50,19 +50,21 @@ to go
 
     ifelse action-vector = (list 0 0 0)
     [
-      let action one-of [1 2 3]
-      if action = 1 [
-        fd 0.5
-        set energy energy - 0.5
-      ]
-      if action = 2 [
-        lt 20
-        set energy energy - 0.1
-      ]
-      if action = 3 [
-        rt 20
-        set energy energy - 0.1
-      ]
+      fd 0.2
+      set energy energy - 0.2
+;      let action one-of [1 2 3]
+;      if action = 1 [
+;        fd 0.5
+;        set energy energy - 0.5
+;      ]
+;      if action = 2 [
+;        lt 20
+;        set energy energy - 0.1
+;      ]
+;      if action = 3 [
+;        rt 20
+;        set energy energy - 0.1
+;      ]
     ]
     [
       ;; get cumulative sums
@@ -78,17 +80,17 @@ to go
       (ifelse n < (item 0 cum-sum) [
         ;; do first action
         fd 0.2
-        set energy energy - 1
+        set energy energy - 0.2
       ]
       n < (item 1 cum-sum) [
         ;; do second action
         lt 20
-        set energy energy - 0.5
+        set energy energy - 0.1
       ]
       n <= (item 2 cum-sum) [
         ;; do third action
         rt 20
-        set energy energy - 0.5
+        set energy energy - 0.1
       ]
       [
         ;; else should never come here
@@ -184,7 +186,7 @@ end
 
 
 to check-death
-  if age > max-age [cgp:clear-cgp die]
+;  if age > max-age [cgp:clear-cgp die]
   if energy < 0 [cgp:clear-cgp die]
 end
 @#$#@#$#@
@@ -258,7 +260,7 @@ num-elephants
 num-elephants
 0
 100
-35.0
+50.0
 1
 1
 NIL
@@ -273,7 +275,7 @@ elephant-gain-from-food
 elephant-gain-from-food
 0
 100
-10.0
+6.0
 1
 1
 NIL
@@ -306,7 +308,7 @@ grass-regrowth-time
 grass-regrowth-time
 100
 1000
-150.0
+280.0
 10
 1
 NIL
@@ -373,7 +375,7 @@ mutation-diff-percent
 mutation-diff-percent
 0
 0.2
-0.05
+0.04
 0.01
 1
 NIL
