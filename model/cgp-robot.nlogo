@@ -1,11 +1,20 @@
-extensions [cgp]
+;;; TA COMMENTS
 
-globals [generation count-pickup count-dropoff location]
+;;; Make sure to submit a packaged jar for CGP when you finally submit. I had to build from your github
+;;; and that version doesn't seem aligned with the below so I can't run your model.
 
-turtles-own [battery action-reward fitness charging-tick is-charging dist_package dist_destination]
-package-own [age]
-charger-own [age]
+;;; Don't forget about filling out the INFO tab.
 
+extensions [cgp] ;; import cgp extension
+
+;; counter values for generation, number of pick-up & drop-offs per each generation
+globals [generation count-pickup count-dropoff]
+
+;; turtles have battery rate, reward for each actions that they take, finess value evaluated after each generation,
+;; tick counter to hold robot during charing, and distances from package and drop-off zone
+turtles-own [battery action-reward fitness charging-tick distance-from-package distance-from-destination]
+
+;; 3 types of agents: robot, items, and charging station
 breed [robot a-robot]
 breed [package a-package]
 breed [charger a-charger]
@@ -14,86 +23,44 @@ to setup
   clear-all
   reset-ticks
 
+  ;; set global variables
   set count-pickup 0
   set count-dropoff 0
   set generation 1
 
-  ;; create robots
-  repeat initial-num-robot [
-    ask one-of patches with [not any? turtles-here
-      and (pxcor != max-pxcor and pxcor != min-pxcor and pycor != max-pycor and pycor != min-pycor)] [
-      sprout-robot 1 [
-        set shape "emblem"
-        set size 2
-        set battery 100
-        set heading 0
-        rt (random 360)
-        set color green
-        set charging-tick 0
-        set fitness 0
-        set dist_package sqrt((14 - xcor) ^ 2)
-        set dist_destination sqrt((-16 - xcor) ^ 2)
-        cgp:add-cgps num-input num-output num-arity num-lv-back num-row num-col
+  repeat initial-num-robot [ ;; create robots
+    ask one-of patches with [not any? turtles-here ;; do not place them over one another
+      and (pxcor != max-pxcor and pxcor != min-pxcor and pycor != max-pycor and pycor != min-pycor)] [ ;; do not locate in wall area
+      sprout-robot 1 [ ;; create a robot
+        set shape "emblem" ;; robot shape as in emblem
+        set size 2 ;; enlarge size a bit
+        set battery 100 ;; initially fully charged
+        set heading 0 ;; reset heading to point the top part as its facade
+        rt (random 360) ;; random heading
+        set color green ;; robots without items (initially) are in green color
+        set charging-tick 0 ;; initially charging not in hold
+        set fitness 0 ;; initially 0 because has not been evaluated yet
+        set distance-from-package sqrt((14 - xcor) ^ 2) ;; calculate the initial distance from package
+        set distance-from-destination sqrt((-16 - xcor) ^ 2) ;; calculate the initial distance from drop-off zone
+        cgp:add-cgps num-input num-output num-arity num-lv-back num-row num-col ;; create cgp object with inputs
       ]
     ]
   ]
 
-  ;; create packages
-  repeat initial-num-package [
-    ask one-of patches with [not any? turtles-here and (pxcor >= 12) and (pxcor < 24)
-      and (pxcor != max-pxcor and pxcor != min-pxcor and pycor != max-pycor and pycor != min-pycor)] [
-      sprout-package 1 [
-        set shape "box"
-        set color brown
-        set size 1.5
-        set age 1
-      ]
-    ]
-  ]
+  create-package-charger ;; create package and charging stations
 
-  ;; create charging stations
-  repeat initial-num-charger [
-    ask one-of patches with [not any? turtles-here and (pxcor > -14) and (pxcor < 12)
-      and (pxcor != max-pxcor and pxcor != min-pxcor and pycor != max-pycor and pycor != min-pycor)] [
-      sprout-charger 1 [
-        set shape "building store"
-        set color blue
-        set size 1.5
-        set age 1
-      ]
-    ]
-  ]
+  ask patches [ set pcolor gray + 1 ] ;; set background color
+  ask patches with [(pxcor >= -24) and (pxcor < -14)] [ set pcolor 118 ] ;; set color for the package drop-off zone
+  ask patches with [(pxcor >= 12) and (pxcor < 24)] [ set pcolor 108 ] ;; set package pick-up zone color
 
-  ;; background color
-  ask patches [
-   set pcolor gray + 1
-  ]
-
-  ;; set color for the package drop-off zone
-  ask patches with [(pxcor >= -24) and (pxcor < -14)] [
-    set pcolor 118
-  ]
-
-  ;; set package pick-up zone color
-  ask patches with [(pxcor >= 12) and (pxcor < 24)] [
-    set pcolor 108
-  ]
-
-  ;; set wall(boundary) color
-  ask patches with [
-    pxcor = max-pxcor or
-    pxcor = min-pxcor or
-    pycor = max-pycor or
-    pycor = min-pycor ] [
-    set pcolor red
-  ]
-
+  ;; set wall(boundary) color into red
+  ask patches with [ pxcor = max-pxcor or pxcor = min-pxcor or pycor = max-pycor or pycor = min-pycor ] [ set pcolor red ]
 end
 
 to go
-  ask robot [
-    let tick-check charging-tick
-    (ifelse tick-check = 0 [
+  ask robot [ ;; manipulate robots' movement depending on charging status
+    let tick-check charging-tick ;; set it as local variable to avoid changing it by accident
+    (ifelse tick-check = 0 [ ;; not in charge
       observation-to-action ;; put observation of each robot to cgp and solve the cgp
       if battery < 0 [die] ;; check whether the robot should die or not
       action-score ;; check for their task performance
@@ -104,182 +71,166 @@ to go
     [ set charging-tick charging-tick - 1 ]) ;; charing on hold
   ]
 
-  ask package [
-    set age age + 1
-    if age > tick-per-generation [die]
-  ]
-
-  ask charger [
-    set age age + 1
-    if age > 100 [die]
-  ]
-
-  reproduce ;; reproduce
-  create-new-items
-  if not any? robot [ stop ]
-  if generation > max-num-generation [
+  reproduce ;; reproduce 3 agents in after each tick
+  if not any? robot [ stop ] ;; if all of the robot died out, stop
+  if generation > max-num-generation [ ;; check if it exceed max generation
     set generation generation - 1 ;; since it adds +1 automatically, take the offset
-    stop
+    stop ;; stop if exceed the max generation
   ]
-  tick
+  tick ;; continue
 end
 
 to observation-to-action
-  let obs get-observations
-    let action-vector cgp:get-action obs
-;    show action-vector ;; testing purpose
+  let obs get-observations ;; get the observation vector
+  let action-vector cgp:get-action obs ;; pass the observation vector into the cgp extension, solve the cgp network recursively
+  ;; returns the predicted action set (compose of a probability set, the sum of the list is 1) after solving the network
 
-    ifelse action-vector = (list 0 0 0) [
-      let action one-of [1 2 3]
-      if action = 1 [fd 1]
-      if action = 2 [lt 20]
-      if action = 3 [rt 20]
+  ifelse action-vector = (list 0 0 0) [ ;; if the action vector does not have an action to choose
+    let action one-of [1 2 3] ;; randomly pick one action out of 1, 2, and 3
+    if action = 1 [fd 1] ;; move forward if it is 1
+    if action = 2 [lt 20] ;; turn left if it is 2
+    if action = 3 [rt 20] ;; turn right if it is 3
+    ;; no battery penalty here if there is no action set returned, otherwise robots will die out and no evolution happens
+  ]
+  [
+    ;; calculate cumulative sum
+    ;; CDF reference: https://softwareengineering.stackexchange.com/questions/150616/get-weighted-random-item
+    let cumulative-sum (list) ;; initialize an empty list
+    set cumulative-sum lput (item 0 action-vector) cumulative-sum ;; put the first value and append
+    set cumulative-sum lput (item 0 action-vector + item 1 action-vector) cumulative-sum ;; add the first and the second value then append
+    set cumulative-sum lput (item 1 cumulative-sum + item 2 action-vector) cumulative-sum ;; add the first, second, and third value then append
+
+    let n random-float sum action-vector ;; pick a random value, out of the total value of the action-vector
+
+    ;; choose an action to perform, based on cumulative distribution function
+    (ifelse n < (item 0 cumulative-sum) [ ;; if random value less than the first value
+      fd 1 ;; move forward
+      set battery battery - 1 ;; used some battery here (more than turning)
+    ]
+    n < (item 1 cumulative-sum) [ ;; if random value less than the second value
+      lt 20 ;; turn left
+      set battery battery - 0.5 ;; used some battery here
+    ]
+    n < (item 2 cumulative-sum) [ ;; if random value less than the third value
+      rt 20 ;; turn right
+      set battery battery - 0.5 ;; used some battery here
     ]
     [
-
-      ;;; What is all of this stuff below? It's totally opaque. You'll either need comments
-      ;;; or to write in a style that can be readable
-
-      ;; get cumulative sums
-    ;; weighted choice: https://softwareengineering.stackexchange.com/questions/150616/get-weighted-random-item
-      let cum-sum (list)
-      set cum-sum lput (item 0 action-vector) cum-sum
-      set cum-sum lput (item 0 action-vector + item 1 action-vector) cum-sum
-      set cum-sum lput (item 1 cum-sum + item 2 action-vector) cum-sum
-
-      let n random-float sum action-vector ;; roll the dice
-
-      ;; randomly choose an action to perform
-      (ifelse n < (item 0 cum-sum) [ ;; perform first action
-        fd 0.2
-        set battery battery - 1
-      ]
-      n < (item 1 cum-sum) [ ;; perform second action
-        lt 20
-        set battery battery - 0.5
-      ]
-      n < (item 2 cum-sum) [ ;; perform third action
-        rt 20
-        set battery battery - 0.5
-      ]
-      [
-        ;; else should never come here
-          print "Should not be here"
-      ])
-    ]
+      ;; empty else block
+        print "Should not be here"
+    ])
+  ]
 end
 
 to action-score
   let pick one-of package-here ;; check for pick-up
-  if pick != nobody [
-    if color != orange [ ;; reward for pick up
-      ask pick [die]
-      set action-reward action-reward + 5000
-      set color orange
-      set count-pickup count-pickup + 1
+  if pick != nobody [ ;; if there is a package to pick-up
+    if color != orange [ ;; if the robot is not carrying any package yet
+      ask pick [die] ;; pick up the package
+      set action-reward action-reward + 5000 ;; reward for picking up an item
+      set color orange ;; change the robot color into orange to mark it as carrying a package
+      set count-pickup count-pickup + 1 ;; number of pick-up count +1
     ]
-;    [ set action-reward action-reward - 1 ] ;; penalize if they try to hold 2 packages
   ]
 
   let destination patch-here ;; check if it is on drop-off area
-  if destination != nobody and pcolor = 118 [
-    ifelse color = orange [ ;; reward for delivering
-      set action-reward action-reward + 30000
-      set color green
-      set count-dropoff count-dropoff + 1
+  if destination != nobody and pcolor = 118 [ ;; if robot located in drop-off zone
+    ifelse color = orange [ ;; if robot is carrying the package
+      set action-reward action-reward + 30000 ;; reward for deliverying the package
+      set color green ;; hands free now, so color it back to green
+      set count-dropoff count-dropoff + 1 ;; number of drop-off count +1
     ]
     [ set action-reward action-reward - 10 ] ;; penalize for staying here w/o item
   ]
 
   let wall patch-here ;; check whether the robot is in wall
   if wall != nobody and pcolor = red [ ;; if bumped
-    set action-reward action-reward - 5
+    set action-reward action-reward - 5 ;; penalize for bumping into the wall
     rt 180 ;; turn around
     fd 1 ;; move off from the wall
   ]
 
   let charging one-of charger-here ;; recharge the robot
-  if charging != nobody and charging-tick = 0 [
+  if charging != nobody and charging-tick = 0 [ ;; if robot stop by at the charging station
     set charging-tick ceiling (tick-per-generation * 0.05) + 1 ;; hold for 5% time of each generation
-    set battery 100
-    set action-reward action-reward + 10
+    set battery 100 ;; charge the battery to full
+    set action-reward action-reward + 10 ;; give reward for stopping by at the charging station
   ]
 
-  let curr_dist_package sqrt((14 - xcor) ^ 2)
-  let curr_dist_destination sqrt((-16 - xcor) ^ 2)
-  ifelse color = orange [ ;; carrying item
-    (ifelse curr_dist_package < dist_package [ set action-reward action-reward +  50 ]
-      curr_dist_package = dist_package [ set action-reward action-reward - 30 ]
-    [ set action-reward action-reward - 50 ] )
+  let current-distance-from-package sqrt((14 - xcor) ^ 2) ;; calculate the current distance between package and the robot
+  let current-distance-from-destination sqrt((-16 - xcor) ^ 2) ;; calculate the current distance between destination area and the robot
+  ifelse color = orange [ ;; if robot carrying package
+    (ifelse current-distance-from-package < distance-from-package [ set action-reward action-reward +  150 ] ;; if approaching to drop-off zone, reward
+      current-distance-from-package = distance-from-package [ set action-reward action-reward - 30 ] ;; if stagnated, penalize
+    [ set action-reward action-reward - 50 ] ) ;; if moving further away from the drop-off zone, penalize
   ]
-  [ (ifelse curr_dist_destination < dist_destination [ set action-reward action-reward + 50 ]
-    curr_dist_destination = dist_destination [ set action-reward action-reward - 30 ]
-    [ set action-reward action-reward - 50 ])
+  [ ;; if robot without carrying package
+    (ifelse current-distance-from-destination < distance-from-destination [ set action-reward action-reward + 150 ] ;; if approaching to pick-up area, reward
+    current-distance-from-destination = distance-from-destination [ set action-reward action-reward - 30 ] ;; if stagnated, penalize
+    [ set action-reward action-reward - 50 ]) ;; if moving further away from pick-up area, penalize
   ]
 end
 
 to-report get-observations
-  let obs []
-  rt 20
-  repeat 3 [
-    set obs sentence obs (get-in-cone 7 20)
-    lt 20
+  let obs [] ;; initialize the merged observation vector for the 3 angles (front, left, right)
+  rt 20 ;; right turn by 20 (observation start from the most right side)
+  repeat 3 [ ;; repeat 3 times for right-front-left
+    set obs sentence obs (get-in-cone 7 20) ;; get the observation vector, append it
+    lt 20 ;; left turn by 20 to go to front and then left one
   ]
-  rt 40
-  set obs map [i -> i / 7] obs
-
-  report obs
+  rt 40 ;; come back to its original position
+  set obs map [i -> i / 7] obs ;; map distance values to range from 0-1
+  report obs ;; return the final observation vector
 end
 
 to-report get-in-cone [dist angle]
-  let obs []
+  let obs [] ;; initialize observation vector
 
-  let cone other turtles in-cone 7 20
-  let front-patches patches in-cone 7 20
+  let cone other turtles in-cone 7 20 ;; get turtles within the cone area
+  let front-patches patches in-cone 7 20 ;; get patches within the cone area
 
-  let r min-one-of cone with [is-a-robot? self] [distance myself]
-  if-else r = nobody [ set obs lput 0 obs ]
-  [ set obs lput (7 - ((distance r) / 2)) obs ]
+  let r min-one-of cone with [is-a-robot? self] [distance myself] ;; get the distance between one of the min robot agent from the current itself
+  if-else r = nobody [ set obs lput 0 obs ] ;; if none found, put 0
+  [ set obs lput (7 - ((distance r) / 2)) obs ] ;; calculate the distance, offset it to make the range between 0-7
 
-  let p min-one-of cone with [is-a-package? self] [distance myself]
-  if-else p = nobody [ set obs lput 0 obs ]
-  [ set obs lput (7 - ((distance p) / 2)) obs ]
+  let p min-one-of cone with [is-a-package? self] [distance myself] ;; get the distance between one of the min package agent from the current itself
+  if-else p = nobody [ set obs lput 0 obs ] ;; if none found, put 0
+  [ set obs lput (7 - ((distance p) / 2)) obs ] ;; calculate the distance, offset it to make the range between 0-7
 
-  let c min-one-of cone with [is-a-charger? self] [distance myself]
-  if-else c = nobody [ set obs lput 0 obs ]
-  [ set obs lput (7 - ((distance c) / 2)) obs ]
+  let c min-one-of cone with [is-a-charger? self] [distance myself] ;; get the distance between one of the min charger agent from the current itself
+  if-else c = nobody [ set obs lput 0 obs ] ;; if none found, put 0
+  [ set obs lput (7 - ((distance c) / 2)) obs ] ;; calculate the distance, offset it to make the range between 0-7
 
-  let w min-one-of front-patches with [pcolor = red] [distance myself]
-  if-else w = nobody [ set obs lput 0 obs ]
-  [ set obs lput (7 - ((distance w) / 2)) obs ]
+  let w min-one-of front-patches with [pcolor = red] [distance myself] ;; get the distance between one of the min wall patch from the current itself
+  if-else w = nobody [ set obs lput 0 obs ] ;; if none found, put 0
+  [ set obs lput (7 - ((distance w) / 2)) obs ] ;; calculate the distance, offset it to make the range between 0-7
 
-  let d min-one-of front-patches with [pcolor = 118] [distance myself]
-  if-else d = nobody [ set obs lput 0 obs ]
-  [ set obs lput (7 - ((distance d) / 2)) obs ]
+  let d min-one-of front-patches with [pcolor = 118] [distance myself] ;; get the distance between one of the min drop-off patch from the current itself
+  if-else d = nobody [ set obs lput 0 obs ] ;; if none found, put 0
+  [ set obs lput (7 - ((distance d) / 2)) obs ] ;; calculate the distance, offset it to make the range between 0-7
 
-  report obs
+  report obs ;; return the observation vector
 end
 
-to create-new-items
-  if random 100 < 10 [
-    ask one-of patches with [not any? turtles-here and (pxcor >= 12) and (pxcor < 24)
-      and (pxcor != max-pxcor and pxcor != min-pxcor and pycor != max-pycor and pycor != min-pycor)] [
-      sprout-package 1 [
-        set shape "box"
-        set color brown
-        set size 1.5
-        set age 1
+to create-package-charger
+  repeat initial-num-package [ ;; create packages
+    ask one-of patches with [not any? turtles-here and (pxcor >= 12) and (pxcor < 24) ;; no overlapping packages, locate right side
+      and (pxcor != max-pxcor and pxcor != min-pxcor and pycor != max-pycor and pycor != min-pycor)] [ ;; do not locate in wall area
+      sprout-package 1 [ ;; create a package
+        set shape "box" ;; box shape
+        set color brown ;; brown box
+        set size 1.5 ;; enlarge size a bit
       ]
     ]
   ]
-  if random 100 < 5 [
-    ask one-of patches with [not any? turtles-here and (pxcor > -14) and (pxcor < 12)
-      and (pxcor != max-pxcor and pxcor != min-pxcor and pycor != max-pycor and pycor != min-pycor)] [
-      sprout-charger 1 [
-        set shape "building store"
-        set color blue
-        set size 1.5
-        set age 1
+
+  repeat initial-num-charger [ ;; create charging stations
+    ask one-of patches with [not any? turtles-here and (pxcor > -14) and (pxcor < 12) ;; no overlapping charging stations, locate right side
+      and (pxcor != max-pxcor and pxcor != min-pxcor and pycor != max-pycor and pycor != min-pycor)] [ ;; do not loate in wall area
+      sprout-charger 1 [ ;; create a charging station
+        set shape "building store" ;; gas station shape
+        set color blue ;; colored in blue
+        set size 1.5 ;; enlarge size a bit
       ]
     ]
   ]
@@ -287,65 +238,43 @@ end
 
 to reproduce
   if ticks mod tick-per-generation = 0 and ticks != 0 [ ;; in every num-generation tick
-    set generation generation + 1
-    set count-pickup 0
-    set count-dropoff 0
-
-    ;; calculate fitness value
-    ask robot [
-      set color red ;; to make it die
-      set fitness action-reward + battery / 10
+    ask robot [ ;; evalute fitness value of each turtle
+      set color red ;; to make it die, differentiate newly created ones and old ones
+      set fitness action-reward + battery / 10 ;; calculate fitness value
     ]
 
-    repeat(initial-num-robot / 10) [
-      let parent one-of (robot with-max [fitness])
-;      show [fitness] of parent
-      repeat 10 [ ;; copy the robot software
-        ask one-of patches with [not any? turtles-here
-          and (pxcor != max-pxcor and pxcor != min-pxcor and pycor != max-pycor and pycor != min-pycor)] [
-          sprout-robot 1 [
-            set shape "emblem"
-            set size 2
-            set battery 100
-            set heading 0
-            rt (random 360)
-            set color green
-            set charging-tick 0
-            set fitness 0
-            ;; mutation and reproduction rate, respectively
-            cgp:mutate-reproduce parent mutation-rate num-input num-output num-arity num-lv-back num-row num-col
+    repeat(initial-num-robot / 10) [ ;; pick the top (initial-num-robot / 10) number of parents
+      let parent one-of (robot with-max [fitness]) ;; get the turtle with the highest fitness value
+      repeat 10 [ ;; copy the robot software into the 10 new child robots
+        ask one-of patches with [not any? turtles-here ;; do not overlap turtles
+          and (pxcor != max-pxcor and pxcor != min-pxcor and pycor != max-pycor and pycor != min-pycor)] [ ;; do not locate in wall area
+          sprout-robot 1 [ ;; create robot
+            set shape "emblem" ;; robot shape as in emblem
+            set size 2 ;; enlarge size a bit
+            set battery 100 ;; initially fully charged
+            set heading 0 ;; reset heading to point the top part as its facade
+            rt (random 360) ;; random heading
+            set color green ;; robots without items (initially) are in green color
+            set charging-tick 0 ;; initially charging not in hold
+            set fitness 0 ;; initially 0 because has not been evaluated yet
+            set distance-from-package sqrt((14 - xcor) ^ 2) ;; calculate the initial distance from package
+            set distance-from-destination sqrt((-16 - xcor) ^ 2) ;; calculate the initial distance from drop-off zone
+            cgp:mutate-reproduce parent mutation-rate num-input num-output num-arity num-lv-back num-row num-col ;; mutate from the sparent & reproduce
           ]
         ]
       ]
-      ask parent [die]
+      ask parent [die] ;; kill the parent so that another turtle with the next highest fitness value can be selected
     ]
-    ask robot with [color = red] [die] ;; kill the rest of them
-  ]
-end
 
-to draw-cone [degrees depth]
-  rt degrees / 2.0
-  pd
-  fd depth
-  lt 180 - ((180 - degrees) / 2.0)
-  fd sqrt (2 * depth ^ 2 * (1 - cos degrees))
-  lt 180 - ((180 - degrees) / 2.0)
-  fd depth
-  lt 180 - (degrees / 2.0)
-  pu
-end
+    ;; kill the old agents from the previous generation
+    ask robot with [color = red] [die]
+    ask package [die]
+    ask charger [die]
+    create-package-charger ;; re-create package and charging stations
 
-to draw-cones [offset depth degrees num]
-  hatch 1 [
-    hide-turtle
-    set color white
-    lt offset
-    repeat num [
-      draw-cone degrees depth
-      rt degrees
-    ]
-    lt offset + degrees
-    die
+    set generation generation + 1 ;; increment the generation counter
+    set count-pickup 0 ;; reset number of pick-up done for this generation
+    set count-dropoff 0 ;; reset number of drop-off done for this generation
   ]
 end
 @#$#@#$#@
@@ -394,10 +323,10 @@ NIL
 1
 
 INPUTBOX
-292
-274
-381
-334
+230
+90
+319
+150
 mutation-rate
 0.05
 1
@@ -422,10 +351,10 @@ NIL
 1
 
 MONITOR
-227
-287
-284
-332
+320
+290
+377
+335
 Robot
 count robot
 17
@@ -452,15 +381,15 @@ PENS
 "num-dropoff" 1.0 0 -11085214 true "" "if ticks mod tick-per-generation = 0 and ticks != 0 [plot count-dropoff]"
 
 SLIDER
-28
-87
-200
-120
+25
+90
+197
+123
 initial-num-robot
 initial-num-robot
 10
 50
-40.0
+30.0
 10
 1
 NIL
@@ -476,21 +405,21 @@ max-num-generation
 0
 2000
 500.0
-500
+100
 1
 NIL
 HORIZONTAL
 
 SLIDER
-28
+25
 130
-208
+205
 163
 initial-num-package
 initial-num-package
-1
+30
 100
-30.0
+50.0
 10
 1
 NIL
@@ -1014,5 +943,5 @@ true
 Line -7500403 true 150 150 90 180
 Line -7500403 true 150 150 210 180
 @#$#@#$#@
-0
+1
 @#$#@#$#@
