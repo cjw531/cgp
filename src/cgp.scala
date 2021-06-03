@@ -251,7 +251,7 @@ class cgp extends api.DefaultClassManager {
 
     // remake nodes by certain probability
     var flag_changed = false
-    while (flag_changed == false) {
+//    while (flag_changed == false) {
       var last_node_number_in_column = mutated_cgp.num_inputs - 1
       var row_counter = 1
       for (node_idx <- 0 to (mutated_cgp.node_list.length - 1) + mutated_cgp.num_outputs) {
@@ -283,7 +283,7 @@ class cgp extends api.DefaultClassManager {
         }
         row_counter += 1
       }
-    }
+//    }
 
     // compute active nodes
     mutated_cgp.find_active_nodes()
