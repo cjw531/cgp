@@ -34,7 +34,7 @@ to setup
     set color black
     set size 3.0
     set economy 0
-;    cgp:add-cgps 21 3 2 4 4
+    cgp:add-cgps 21 3 32 21 32
     set heading 0
   ]
 
@@ -142,8 +142,31 @@ to go
    ]
   ]
 
+    if (ticks > 0) and (ticks mod num-generation = 0) [
+     new-gen-poachers
+   ]
+
   if count elephants = 0 [ stop ]
   tick
+end
+
+to new-gen-poachers
+  set generation generation + 1
+  let best-poacher one-of (poachers with-max [economy])
+  if best-poacher != nobody [
+    ask poachers with [who != [who] of best-poacher] [die ]
+    repeat num-poachers [
+      create-poachers 1 [
+        setxy ([xcor] of best-poacher) ([ycor] of best-poacher)
+        set shape "poacher"
+        set color black
+        set size 3.0
+        cgp:mutate-reproduce best-poacher mutation-diff-percent
+        set economy 0
+        set cooldown trap-cooldown
+      ]
+    ]
+  ]
 end
 
 to kill-elephant
@@ -173,12 +196,9 @@ end
 
 to check-trap
   if trap = 1 [
-   show "trap here"
    ask traps-on patch-here [die]
    set trap 0
    cgp:clear-cgp
-   show "dying"
-   show who
   hatch-dead-elephants 1[
     set shape "dead-elephant"
     set color red
@@ -708,7 +728,7 @@ num-generation
 num-generation
 20
 1000
-200.0
+380.0
 5
 1
 NIL
