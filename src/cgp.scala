@@ -114,7 +114,7 @@ class cgp extends api.DefaultClassManager {
         this.node_list += new_node
         if (row_counter % this.num_rows == 0) {
           last_node_number_in_column = i
-          println(last_node_number_in_column)
+//          println(last_node_number_in_column)
           row_counter = 0
         }
         row_counter += 1
@@ -234,8 +234,8 @@ class cgp extends api.DefaultClassManager {
   /////////////////////////
   def mutate_cgp(parent_cgp: Cgp, mutation_rate: Double): Cgp = {
     // deep copy CGP
-    print("Num Outputs: ")
-    println(parent_cgp.num_outputs)
+//    print("Num Outputs: ")
+//    println(parent_cgp.num_outputs)
     var mutated_cgp = new Cgp(parent_cgp.num_inputs, parent_cgp.num_outputs, parent_cgp.lvls_back, parent_cgp.num_rows, parent_cgp.num_cols)
     var node_list_copied = ListBuffer[Node]()
     for (node <- parent_cgp.node_list) {
