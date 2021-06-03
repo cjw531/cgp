@@ -4,11 +4,13 @@ globals [generation]
 
 elephants-own [energy age]
 poachers-own [economy cooldown]
+dead-elephants-own [age]
 patches-own [countdown trap trap-age]
 
 breed [elephants elephant]
 breed [poachers poacher]
 breed [traps a-trap]
+breed [dead-elephants dead-elephant]
 
 
 to setup
@@ -21,7 +23,8 @@ to setup
     set shape "elephant"
     set size 4.5
     set energy 100
-    cgp:add-cgps 15 3 20 20 20 ;; inputs outputs lvls rows cols
+    cgp:add-cgps 21 3 32 21 32 ;; inputs outputs lvls rows cols
+    ;; do 21 105 1:5 ratio
     set age 1
   ]
 
@@ -105,10 +108,18 @@ to go
     set age age + 1
   ]
 
+  ask dead-elephants [
+    if age > time-to-decompose-carcass [
+      die
+    ]
+    set age age + 1
+  ]
+
   ask poachers [
      lt random 20
      rt random 20
      fd 0.2
+     check-for-dead-elephant
      kill-elephant
      ifelse cooldown = 0  [
       place-trap
@@ -139,7 +150,7 @@ to kill-elephant
   let prey one-of elephants-here
   if prey != nobody [
     ask prey [cgp:clear-cgp die]
-    set economy economy + 10000
+    set economy (economy + price-of-ivory - cost-to-murder-elephant)
   ]
 end
 
@@ -168,6 +179,12 @@ to check-trap
    cgp:clear-cgp
    show "dying"
    show who
+  hatch-dead-elephants 1[
+    set shape "dead-elephant"
+    set color red
+    set size 3
+    set age 1
+  ]
    die
   ]
 end
@@ -230,15 +247,20 @@ to-report get-in-cone [dist angle]
   [
     set obs lput (7 - ((distance ytrap) / 2)) obs
   ]
-;  let ntrap min-one-of patches in-cone (dist) (angle) with [trap = 0] [distance myself]
-;  if-else ntrap = nobody [
-;    set obs lput 0 obs
-;  ]
-;  [
-;    set obs lput (7 - ((distance ntrap) / 2)) obs
-;  ]
+  let ded-elf min-one-of cone with [is-dead-elephant? self] [distance myself]
+  if-else ded-elf = nobody [
+    set obs lput 0 obs
+  ]
+  [
+    set obs lput (7 - ((distance ded-elf) / 2)) obs
+  ]
   report obs
 end
+
+;; poacher will need to observer
+;;;; elephant
+;;;; dead elephant
+;;;; self?
 
 to grow-grass
   if pcolor = brown [
@@ -262,6 +284,14 @@ to reproduce
       cgp:mutate-reproduce myself mutation-diff-percent
       set age 1
     ]  ; hatch an offspring and move it forward 1 step
+  ]
+end
+
+to check-for-dead-elephant
+  if any? dead-elephants-on patch-here
+  [
+    ask dead-elephants-on patch-here [die]
+   set economy economy + cost-to-lay-trap
   ]
 end
 
@@ -792,6 +822,51 @@ price-of-ivory
 NIL
 HORIZONTAL
 
+SLIDER
+403
+412
+615
+445
+cost-to-murder-elephant
+cost-to-murder-elephant
+2000
+10000
+8000.0
+100
+1
+NIL
+HORIZONTAL
+
+SLIDER
+422
+456
+594
+489
+cost-to-lay-trap
+cost-to-lay-trap
+1000
+10000
+2000.0
+100
+1
+NIL
+HORIZONTAL
+
+SLIDER
+300
+408
+503
+441
+time-to-decompose-carcass
+time-to-decompose-carcass
+50
+1000
+250.0
+20
+1
+NIL
+HORIZONTAL
+
 @#$#@#$#@
 ## WHAT IS IT?
 
@@ -928,6 +1003,11 @@ cylinder
 false
 0
 Circle -7500403 true true 0 0 300
+
+dead-elephant
+true
+0
+Polygon -7500403 true true 105 180 90 195 60 195 45 180 60 165 90 150 105 135 120 120 135 90 180 105 195 120 240 120 270 135 285 165 285 180 285 210 270 225 240 240 195 225 195 255 225 270 210 285 165 255 165 240 165 210 180 195 195 195 195 180 165 195 150 210 150 240 150 255 165 270 180 285 150 285 135 255 135 225 150 195 165 180 180 165 150 180 135 195 135 225 120 240 120 255 120 270 90 240 120 195 75 240 60 210 120 180 120 165 150 165 180 150 180 135 180 120 165 120 150 120 120 135 105 165 105 180
 
 dot
 false
