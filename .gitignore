@@ -8,3 +8,4 @@ project/project/
 project/target/
 target/
 *.tmp.nlogo
+.DS_Store
