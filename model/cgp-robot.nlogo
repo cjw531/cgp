@@ -33,7 +33,7 @@ to setup
         set fitness 0
         set dist_package sqrt((14 - xcor) ^ 2)
         set dist_destination sqrt((-16 - xcor) ^ 2)
-        cgp:add-cgps 9 3 2 5 5
+        cgp:add-cgps num-input num-output num-arity num-lv-back num-row num-col
       ]
     ]
   ]
@@ -69,17 +69,17 @@ to setup
    set pcolor gray + 1
   ]
 
-  ;; set destination color
+  ;; set color for the package drop-off zone
   ask patches with [(pxcor >= -24) and (pxcor < -14)] [
     set pcolor 118
   ]
 
-  ;; set package zone color
+  ;; set package pick-up zone color
   ask patches with [(pxcor >= 12) and (pxcor < 24)] [
     set pcolor 108
   ]
 
-  ;; set wall
+  ;; set wall(boundary) color
   ask patches with [
     pxcor = max-pxcor or
     pxcor = min-pxcor or
@@ -117,6 +117,10 @@ to go
   reproduce ;; reproduce
   create-new-items
   if not any? robot [ stop ]
+  if generation > max-num-generation [
+    set generation generation - 1 ;; since it adds +1 automatically, take the offset
+    stop
+  ]
   tick
 end
 
@@ -308,7 +312,8 @@ to reproduce
             set color green
             set charging-tick 0
             set fitness 0
-            cgp:mutate-reproduce parent 0.05 9 3 2 5 5;; mutation and reproduction rate, respectively
+            ;; mutation and reproduction rate, respectively
+            cgp:mutate-reproduce parent mutation-rate num-input num-output num-arity num-lv-back num-row num-col
           ]
         ]
       ]
@@ -345,9 +350,9 @@ to draw-cones [offset depth degrees num]
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-509
+515
 10
-1296
+1302
 543
 -1
 -1
@@ -372,10 +377,10 @@ ticks
 30.0
 
 BUTTON
-120
-239
-188
-272
+119
+298
+187
+331
 NIL
 go
 T
@@ -389,10 +394,10 @@ NIL
 1
 
 INPUTBOX
-261
-192
-350
-252
+292
+274
+381
+334
 mutation-rate
 0.05
 1
@@ -400,10 +405,10 @@ mutation-rate
 Number
 
 BUTTON
-46
-239
-112
-272
+45
+298
+111
+331
 NIL
 setup
 NIL
@@ -417,10 +422,10 @@ NIL
 1
 
 MONITOR
-39
-192
-96
-237
+227
+287
+284
+332
 Robot
 count robot
 17
@@ -428,10 +433,10 @@ count robot
 11
 
 PLOT
-40
-282
-479
-548
+38
+355
+395
+558
 Population per Generation
 NIL
 NIL
@@ -446,52 +451,41 @@ PENS
 "num-pickup" 1.0 0 -955883 true "" "if ticks mod tick-per-generation = 0 and ticks != 0 [plot count-pickup]"
 "num-dropoff" 1.0 0 -11085214 true "" "if ticks mod tick-per-generation = 0 and ticks != 0 [plot count-dropoff]"
 
-MONITOR
-115
-191
-194
-236
-max energy
-max [battery] of robot
-17
-1
-11
-
 SLIDER
-33
-20
-205
-53
+28
+87
+200
+120
 initial-num-robot
 initial-num-robot
 10
 50
-30.0
+40.0
 10
 1
 NIL
 HORIZONTAL
 
 SLIDER
-289
-26
-461
-59
-num-generation
-num-generation
-100
-1000
-220.0
-20
+28
+253
+226
+286
+max-num-generation
+max-num-generation
+0
+2000
+500.0
+500
 1
 NIL
 HORIZONTAL
 
 SLIDER
-33
-63
-213
-96
+28
+130
+208
+163
 initial-num-package
 initial-num-package
 1
@@ -503,10 +497,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-32
-104
-217
-137
+27
+171
+212
+204
 initial-num-charger
 initial-num-charger
 0
@@ -518,10 +512,10 @@ NIL
 HORIZONTAL
 
 MONITOR
-364
-192
-465
-253
+392
+273
+493
+334
 generation
 generation
 17
@@ -529,10 +523,10 @@ generation
 15
 
 SLIDER
-34
-144
-229
-177
+29
+211
+224
+244
 tick-per-generation
 tick-per-generation
 300
@@ -542,6 +536,72 @@ tick-per-generation
 1
 NIL
 HORIZONTAL
+
+INPUTBOX
+30
+15
+107
+75
+num-input
+10.0
+1
+0
+Number
+
+INPUTBOX
+110
+15
+196
+75
+num-output
+3.0
+1
+0
+Number
+
+INPUTBOX
+199
+15
+274
+75
+num-arity
+2.0
+1
+0
+Number
+
+INPUTBOX
+278
+15
+365
+75
+num-lv-back
+15.0
+1
+0
+Number
+
+INPUTBOX
+369
+15
+433
+75
+num-row
+15.0
+1
+0
+Number
+
+INPUTBOX
+437
+15
+499
+75
+num-col
+15.0
+1
+0
+Number
 
 @#$#@#$#@
 ## WHAT IS IT?

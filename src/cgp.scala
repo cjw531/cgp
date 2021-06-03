@@ -29,10 +29,10 @@ class cgp extends api.DefaultClassManager {
   }
 
   /* Cgp Class */
-  class Cgp(input: Int, output: Int, level: Int, row: Int, col: Int, funcs: List[List[Double] => Double]) {
+  class Cgp(input: Int, output: Int, node_arity: Int, level: Int, row: Int, col: Int, funcs: List[List[Double] => Double]) {
     val num_input = input
     val num_output = output
-    val arity = 2
+    val arity = node_arity
     val lv_back = level
     val num_row = row
     val num_col = col
@@ -471,7 +471,7 @@ class cgp extends api.DefaultClassManager {
     funcs.constant, funcs.compare_1, funcs.compare_2, funcs.compare_3)
 
   // initialize because scala doesn't allow variable declaration without initialization
-  var CGP_to_mutate = new Cgp(-1, num_output, lv_back, num_row, num_col, function_options)
+  var CGP_to_mutate = new Cgp(-1, num_output, arity, lv_back, num_row, num_col, function_options)
 
   var turtlesToCgps: mutable.Map[api.Turtle, Cgp] = mutable.LinkedHashMap[api.Turtle, Cgp]()
 
@@ -486,18 +486,19 @@ class cgp extends api.DefaultClassManager {
 
   object mutate_reproduce extends api.Command {
     override def getSyntax: Syntax =
-      Syntax.commandSyntax(right = List(Syntax.AgentType, Syntax.NumberType, Syntax.NumberType, Syntax.NumberType, Syntax.NumberType, Syntax.NumberType, Syntax.NumberType), agentClassString = "-T--")
+      Syntax.commandSyntax(right = List(Syntax.AgentType, Syntax.NumberType, Syntax.NumberType, Syntax.NumberType, Syntax.NumberType, Syntax.NumberType, Syntax.NumberType, Syntax.NumberType), agentClassString = "-T--")
 
     override def perform(args: Array[Argument], context: Context): Unit = {
       CGP_to_mutate = turtlesToCgps(args(0).getAgent.asInstanceOf[api.Turtle]) // get cgp from parameter
       var mutation_rate = args(1).getDoubleValue
       var numb_inps = args(2).getIntValue
       var numb_outs = args(3).getIntValue
-      var numb_lvls = args(4).getIntValue
-      var numb_rows = args(5).getIntValue
-      var numb_cols = args(6).getIntValue
+      var numb_arts = args(4).getIntValue
+      var numb_lvls = args(5).getIntValue
+      var numb_rows = args(6).getIntValue
+      var numb_cols = args(7).getIntValue
       // Make new CGP with same properties as parent
-      var mutated_cgp = new Cgp(numb_inps, numb_outs, numb_lvls, numb_rows, numb_cols, function_options)
+      var mutated_cgp = new Cgp(numb_inps, numb_outs, numb_arts, numb_lvls, numb_rows, numb_cols, function_options)
       // Set nodes in node list
       for (node <- CGP_to_mutate.node_list) {
         var copied_node = new Node(node.func_idx, node.number, node.col_where)
@@ -534,15 +535,16 @@ class cgp extends api.DefaultClassManager {
   }
 
   object addCgp extends api.Command {
-    override def getSyntax: Syntax = Syntax.commandSyntax(right = List(Syntax.NumberType, Syntax.NumberType, Syntax.NumberType, Syntax.NumberType, Syntax.NumberType), agentClassString = "-T--")
+    override def getSyntax: Syntax = Syntax.commandSyntax(right = List(Syntax.NumberType, Syntax.NumberType, Syntax.NumberType, Syntax.NumberType, Syntax.NumberType, Syntax.NumberType), agentClassString = "-T--")
 
     override def perform(args: Array[Argument], context: Context): Unit = {
       var numb_inps = args(0).getIntValue
       var numb_outs = args(1).getIntValue
-      var numb_lvls = args(2).getIntValue
-      var numb_rows = args(3).getIntValue
-      var numb_cols = args(4).getIntValue
-      var net = new Cgp(numb_inps, numb_outs, numb_lvls, numb_rows, numb_cols, function_options)
+      var numb_arts = args(2).getIntValue
+      var numb_lvls = args(3).getIntValue
+      var numb_rows = args(4).getIntValue
+      var numb_cols = args(5).getIntValue
+      var net = new Cgp(numb_inps, numb_outs, numb_arts, numb_lvls, numb_rows, numb_cols, function_options)
       net.create_cgp()
       net.find_active_nodes()
       context.getAgent match {
