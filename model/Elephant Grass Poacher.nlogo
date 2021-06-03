@@ -1,10 +1,14 @@
 extensions [cgp]
 
+globals [generation]
+
 elephants-own [energy age]
-patches-own [countdown]
+poachers-own [economy cooldown]
+patches-own [countdown trap trap-age]
 
 breed [elephants elephant]
 breed [poachers poacher]
+breed [traps a-trap]
 
 
 to setup
@@ -17,7 +21,7 @@ to setup
     set shape "elephant"
     set size 4.5
     set energy 100
-    cgp:add-cgps 12 3 12 12 12 ;; inputs outputs lvls rows cols
+    cgp:add-cgps 15 3 20 20 20 ;; inputs outputs lvls rows cols
     set age 1
   ]
 
@@ -26,7 +30,7 @@ to setup
     set shape "poacher"
     set color black
     set size 3.0
-;    set economy 0
+    set economy 0
 ;    cgp:add-cgps 21 3 2 4 4
     set heading 0
   ]
@@ -96,6 +100,7 @@ to go
     ]
     eat
     reproduce
+    check-trap
     check-death
     set age age + 1
   ]
@@ -105,11 +110,25 @@ to go
      rt random 20
      fd 0.2
      kill-elephant
+     ifelse cooldown = 0  [
+      place-trap
+     ]
+     [
+      set cooldown cooldown - 1
+     ]
+     check-bankrupt
   ]
 
 
   ask patches [
    grow-grass
+   if trap = 1 [
+     if trap-age > max-trap-age [
+        set trap 0
+        ask traps-here [die]
+      ]
+     set trap-age trap-age + 1
+   ]
   ]
 
   if count elephants = 0 [ stop ]
@@ -120,10 +139,38 @@ to kill-elephant
   let prey one-of elephants-here
   if prey != nobody [
     ask prey [cgp:clear-cgp die]
-;    set economy economy + 10000
+    set economy economy + 10000
   ]
 end
 
+to place-trap
+  if economy > 2000
+  [
+    if random 100 < prob-set-trap and trap = 0 [
+;      print "Set trap"
+      set trap 1
+      set trap-age 1
+      set cooldown trap-cooldown
+      set economy economy - 2000
+      hatch-traps 1[
+        set shape "trap"
+        set color red
+      ]
+    ]
+  ]
+end
+
+to check-trap
+  if trap = 1 [
+   show "trap here"
+   ask traps-on patch-here [die]
+   set trap 0
+   cgp:clear-cgp
+   show "dying"
+   show who
+   die
+  ]
+end
 
 to eat
   if pcolor = green [
@@ -176,6 +223,20 @@ to-report get-in-cone [dist angle]
   [
     set obs lput (7 - ((distance poach) / 2)) obs
   ]
+  let ytrap min-one-of patches in-cone (dist) (angle) with [trap = 1] [distance myself]
+  if-else ytrap = nobody [
+    set obs lput 0 obs
+  ]
+  [
+    set obs lput (7 - ((distance ytrap) / 2)) obs
+  ]
+;  let ntrap min-one-of patches in-cone (dist) (angle) with [trap = 0] [distance myself]
+;  if-else ntrap = nobody [
+;    set obs lput 0 obs
+;  ]
+;  [
+;    set obs lput (7 - ((distance ntrap) / 2)) obs
+;  ]
   report obs
 end
 
@@ -209,18 +270,13 @@ to check-death
   if energy < 0 [cgp:clear-cgp die]
 end
 
-;extensions [cgp]
+to check-bankrupt
+  if economy < 0 [cgp:clear-cgp die]
+end
+
+
 ;
-;globals [generation]
 ;
-;elephants-own [energy age]
-;;poachers-own [economy cooldown]
-;patches-own [countdown trap]
-;
-;breed [elephants elephant]
-;breed [poachers poacher]
-;breed [rangers ranger]
-;breed [traps a-trap]
 
 
 ;to setup
@@ -393,143 +449,14 @@ end
 ;  tick
 ;end
 ;
-;;to kill-elephant
-;;  let prey one-of elephants-here
-;;  if prey != nobody [
-;;   ; net gain of 10000
-;;    ask prey [die]
-;;    set economy economy + 10000
-;;  ]
-;;end
+
 ;
-;;to place-trap
-;;  if economy > 2000
-;;  [
-;;    if random 100 < prob-set-trap and trap = 0 [
-;;;      print "Set trap"
-;;      set trap 1
-;;      set cooldown trap-cooldown
-;;      set economy economy - 2000
-;;      hatch-traps 1[
-;;        set shape "trap"
-;;        set color red
-;;      ]
-;;    ]
-;;  ]
-;;end
-;
-;to check-trap
-;  if trap = 1 [
-;   ask traps-on patch-here [die]
-;   set trap 0
-;   die
-;  ]
-;end
-;
-;to eat
-;  if pcolor = green [
-;    set pcolor brown
-;    set energy energy + elephant-gain-from-food
-;  ]
-;end
+
 ;
 ;
-;to-report get-observations
-;  let obs []
-;  rt 30
-;  repeat 3 [
-;    set obs sentence obs (get-in-cone 7 20)
-;    lt 20
-;  ]
-;  rt 30
-;  set obs map [i -> i / 7] obs
-;  report obs
-;end
+
 ;
-;to-report get-in-cone [dist angle]
-;  let obs []
-;  let cone other turtles in-cone dist angle
-;  let el min-one-of cone with [is-elephant? self] [distance myself]
-;  if-else el = nobody [
-;    set obs lput 0 obs
-;  ]
-;  [
-;    set obs lput (7 - ((distance el) / 2)) obs
-;  ]
-;  let p min-one-of cone with [is-poacher? self] [distance myself]
-;  if-else p = nobody [
-;    set obs lput 0 obs
-;  ]
-;  [
-;    set obs lput (7 - ((distance p) / 2)) obs
-;  ]
-;  let r min-one-of cone with [is-ranger? self] [distance myself]
-;  if-else r = nobody [
-;    set obs lput 0 obs
-;  ]
-;  [
-;    set obs lput (7 - ((distance r) / 2)) obs
-;  ]
-;  let pag min-one-of patches in-cone (dist) (angle) with [pcolor = green] [distance myself]
-;  if-else pag = nobody [
-;    set obs lput 0 obs
-;  ]
-;  [
-;    set obs lput (7 - ((distance pag) / 2)) obs
-;  ]
-;  let pab min-one-of patches in-cone (dist) (angle) with [pcolor = brown] [distance myself]
-;  if-else pab = nobody [
-;    set obs lput 0 obs
-;  ]
-;  [
-;    set obs lput (7 - ((distance pab) / 2)) obs
-;  ]
-;  let ytrap min-one-of patches in-cone (dist) (angle) with [trap = 1] [distance myself]
-;  if-else ytrap = nobody [
-;    set obs lput 0 obs
-;  ]
-;  [
-;    set obs lput (7 - ((distance ytrap) / 2)) obs
-;  ]
-;  let ntrap min-one-of patches in-cone (dist) (angle) with [trap = 0] [distance myself]
-;  if-else ntrap = nobody [
-;    set obs lput 0 obs
-;  ]
-;  [
-;    set obs lput (7 - ((distance ntrap) / 2)) obs
-;  ]
-;  report obs
-;end
-;
-;to grow-grass
-;  if pcolor = brown [
-;   ifelse countdown <= 0
-;   [
-;      set pcolor green
-;      set countdown (grass-regrowth-time * 3)
-;   ]
-;   [
-;      set countdown countdown - 1
-;   ]
-;  ]
-;end
-;
-;
-;to move
-;  fd 1
-;end
-;
-;to reproduce
-;  ;; in here, mutate to generate an offspring
-;  if random-float 100 < elephants-reproduce and energy > 100[  ; throw "dice" to see if you will reproduce
-;    set energy (energy / 2)               ; divide energy between parent and offspring
-;    hatch 1 [
-;      rt random-float 360 fd 1
-;      cgp:mutate-reproduce myself mutation-diff-percent
-;      set age 1
-;    ]  ; hatch an offspring and move it forward 1 step
-;  ]
-;end
+
 ;
 ;;to new-gen
 ;;  new-gen-poachers
@@ -559,15 +486,6 @@ end
 ;;    ]
 ;;    ask best-poacher [die]
 ;;  ]
-;;end
-;
-;to check-death
-;  if age > max-age [cgp:clear-cgp die]
-;  if energy < 0 [cgp:clear-cgp die]
-;end
-;
-;;to check-bankrupt
-;;  if economy < 0 [cgp:clear-cgp die]
 ;;end
 @#$#@#$#@
 GRAPHICS-WINDOW
@@ -832,6 +750,47 @@ shoot-to-kill
 1
 1
 -1000
+
+MONITOR
+259
+235
+329
+280
+Economy
+max [economy] of poachers
+17
+1
+11
+
+SLIDER
+224
+303
+396
+336
+max-trap-age
+max-trap-age
+50
+500
+200.0
+5
+1
+NIL
+HORIZONTAL
+
+SLIDER
+417
+372
+589
+405
+price-of-ivory
+price-of-ivory
+2000
+10000
+10000.0
+500
+1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
