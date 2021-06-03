@@ -7,8 +7,8 @@
 
 extensions [cgp] ;; import cgp extension
 
-;; counter values for generation, number of pick-up & drop-offs per each generation
-globals [generation count-pickup count-dropoff]
+;; counter values for generation, number of pick-up, drop-offs, charing per each generation, and the sum of the fitness valu
+globals [generation count-pickup count-dropoff count-charging sum-fitness]
 
 ;; turtles have battery rate, reward for each actions that they take, finess value evaluated after each generation,
 ;; tick counter to hold robot during charing, and distances from package and drop-off zone
@@ -26,7 +26,9 @@ to setup
   ;; set global variables
   set count-pickup 0
   set count-dropoff 0
+  set count-charging 0
   set generation 1
+  set sum-fitness 0
 
   repeat initial-num-robot [ ;; create robots
     ask one-of patches with [not any? turtles-here ;; do not place them over one another
@@ -154,6 +156,7 @@ to action-score
   if charging != nobody and charging-tick = 0 [ ;; if robot stop by at the charging station
     set charging-tick ceiling (tick-per-generation * 0.05) + 1 ;; hold for 5% time of each generation
     set battery 100 ;; charge the battery to full
+    set count-charging count-charging + 1 ;; number of charging count +1
     set action-reward action-reward + 10 ;; give reward for stopping by at the charging station
   ]
 
@@ -238,9 +241,11 @@ end
 
 to reproduce
   if ticks mod tick-per-generation = 0 and ticks != 0 [ ;; in every num-generation tick
+    set sum-fitness 0 ;; reset the fitness sum for the current generation
     ask robot [ ;; evalute fitness value of each turtle
       set color red ;; to make it die, differentiate newly created ones and old ones
       set fitness action-reward + battery / 10 ;; calculate fitness value
+      set sum-fitness sum-fitness + fitness ;; add up all fitness value
     ]
 
     repeat(initial-num-robot / 10) [ ;; pick the top (initial-num-robot / 10) number of parents
@@ -273,16 +278,17 @@ to reproduce
     create-package-charger ;; re-create package and charging stations
 
     set generation generation + 1 ;; increment the generation counter
-    set count-pickup 0 ;; reset number of pick-up done for this generation
-    set count-dropoff 0 ;; reset number of drop-off done for this generation
+    set count-pickup 0 ;; reset number of pick-up for the next generation
+    set count-dropoff 0 ;; reset number of drop-off for the next generation
+    set count-charging 0 ;; reset number of charging for the next generation
   ]
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
 515
-10
+20
 1302
-543
+553
 -1
 -1
 15.9
@@ -306,10 +312,10 @@ ticks
 30.0
 
 BUTTON
-119
-298
-187
-331
+130
+300
+205
+340
 NIL
 go
 T
@@ -323,9 +329,9 @@ NIL
 1
 
 INPUTBOX
-230
+260
 90
-319
+365
 150
 mutation-rate
 0.05
@@ -334,10 +340,10 @@ mutation-rate
 Number
 
 BUTTON
-45
-298
-111
-331
+46
+300
+121
+340
 NIL
 setup
 NIL
@@ -350,21 +356,10 @@ NIL
 NIL
 1
 
-MONITOR
-320
-290
-377
-335
-Robot
-count robot
-17
-1
-11
-
 PLOT
 38
 355
-395
+498
 558
 Population per Generation
 NIL
@@ -378,12 +373,13 @@ true
 "" ""
 PENS
 "num-pickup" 1.0 0 -955883 true "" "if ticks mod tick-per-generation = 0 and ticks != 0 [plot count-pickup]"
-"num-dropoff" 1.0 0 -11085214 true "" "if ticks mod tick-per-generation = 0 and ticks != 0 [plot count-dropoff]"
+"num-dropoff" 1.0 0 -8630108 true "" "if ticks mod tick-per-generation = 0 and ticks != 0 [plot count-dropoff]"
+"num-charging" 1.0 0 -13345367 true "" "if ticks mod tick-per-generation = 0 and ticks != 0 [plot count-charging]"
 
 SLIDER
-25
+30
 90
-197
+215
 123
 initial-num-robot
 initial-num-robot
@@ -396,10 +392,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-28
-253
-226
-286
+30
+250
+215
+283
 max-num-generation
 max-num-generation
 0
@@ -411,9 +407,9 @@ NIL
 HORIZONTAL
 
 SLIDER
-25
+30
 130
-205
+215
 163
 initial-num-package
 initial-num-package
@@ -426,10 +422,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-27
-171
-212
-204
+30
+170
+215
+203
 initial-num-charger
 initial-num-charger
 0
@@ -441,21 +437,21 @@ NIL
 HORIZONTAL
 
 MONITOR
-392
-273
-493
-334
+380
+90
+475
+151
+Generation
 generation
-generation
-17
+15
 1
 15
 
 SLIDER
-29
-211
-224
-244
+30
+210
+215
+243
 tick-per-generation
 tick-per-generation
 300
@@ -489,9 +485,9 @@ num-output
 Number
 
 INPUTBOX
-199
+200
 15
-274
+275
 75
 num-arity
 2.0
@@ -500,9 +496,9 @@ num-arity
 Number
 
 INPUTBOX
-278
+280
 15
-365
+367
 75
 num-lv-back
 15.0
@@ -511,9 +507,9 @@ num-lv-back
 Number
 
 INPUTBOX
-369
+370
 15
-433
+434
 75
 num-row
 15.0
@@ -522,15 +518,33 @@ num-row
 Number
 
 INPUTBOX
-437
+440
 15
-499
+502
 75
 num-col
 15.0
 1
 0
 Number
+
+PLOT
+235
+170
+500
+340
+Average Fitness Per Generation
+NIL
+NIL
+0.0
+10.0
+0.0
+10.0
+true
+false
+"" ""
+PENS
+"sum-fitness" 1.0 0 -16777216 true "" "if ticks mod tick-per-generation = 0 and ticks != 0 [plot sum-fitness / count robot]"
 
 @#$#@#$#@
 ## WHAT IS IT?
