@@ -232,7 +232,7 @@ class cgp extends api.DefaultClassManager {
   /////////////////////////
   ///// mutates CGP ///////
   /////////////////////////
-  def mutate_cgp(parent_cgp: Cgp, mutation_rate: Double): Cgp = {
+  def mutate_cgp(parent_cgp: Cgp, mutation_rate: Double, num_ticks_to_stop_forced_mutation: Int, num_iterations: Int): Cgp = {
     // deep copy CGP
 //    print("Num Outputs: ")
 //    println(parent_cgp.num_outputs)
@@ -251,7 +251,10 @@ class cgp extends api.DefaultClassManager {
 
     // remake nodes by certain probability
     var flag_changed = false
-//    while (flag_changed == false) {
+    while (flag_changed == false) {
+      if (num_iterations >= num_ticks_to_stop_forced_mutation) {
+        flag_changed = true
+      }
       var last_node_number_in_column = mutated_cgp.num_inputs - 1
       var row_counter = 1
       for (node_idx <- 0 to (mutated_cgp.node_list.length - 1) + mutated_cgp.num_outputs) {
@@ -283,7 +286,7 @@ class cgp extends api.DefaultClassManager {
         }
         row_counter += 1
       }
-//    }
+    }
 
     // compute active nodes
     mutated_cgp.find_active_nodes()
@@ -327,11 +330,13 @@ class cgp extends api.DefaultClassManager {
 
   object mutate_reproduce extends api.Command {
     override def getSyntax: Syntax =
-          Syntax.commandSyntax(right = List(Syntax.AgentType, Syntax.NumberType), agentClassString = "-T--")
+          Syntax.commandSyntax(right = List(Syntax.AgentType, Syntax.NumberType, Syntax.NumberType, Syntax.NumberType), agentClassString = "-T--")
     override def perform(args: Array[Argument], context: Context): Unit = {
       var CGP_to_mutate = turtlesToCgps(args(0).getAgent.asInstanceOf[api.Turtle])
       var mutation_rate = args(1).getDoubleValue
-      var offspring_cgp = mutate_cgp(CGP_to_mutate, mutation_rate)
+      var max_ticks = args(2).getIntValue
+      var curr_ticks = args(3).getIntValue
+      var offspring_cgp = mutate_cgp(CGP_to_mutate, mutation_rate, max_ticks, curr_ticks)
       context.getAgent match {
         case turtle: api.Turtle => turtlesToCgps.update(turtle, offspring_cgp)
       }
