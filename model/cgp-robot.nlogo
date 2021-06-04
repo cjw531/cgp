@@ -1,13 +1,6 @@
-;;; TA COMMENTS
-
-;;; Make sure to submit a packaged jar for CGP when you finally submit. I had to build from your github
-;;; and that version doesn't seem aligned with the below so I can't run your model.
-
-;;; Don't forget about filling out the INFO tab.
-
 extensions [cgp] ;; import cgp extension
 
-;; counter values for generation, number of pick-up, drop-offs, charing per each generation, and the sum of the fitness valu
+;; counter values for generation, number of pick-up, drop-offs, charing per each generation, and the sum of the fitness value
 globals [generation count-pickup count-dropoff count-charging sum-fitness]
 
 ;; turtles have battery rate, reward for each actions that they take, finess value evaluated after each generation,
@@ -283,6 +276,14 @@ to reproduce
     set count-charging 0 ;; reset number of charging for the next generation
   ]
 end
+
+to-report reward-action
+  ifelse ticks mod tick-per-generation = 0 [
+    report (count-pickup + count-dropoff + count-charging) ;; reporter for the reward action
+  ]
+  [report ""; where "" is an empty placeholder text that you may ignore.
+  ]
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
 515
@@ -400,7 +401,7 @@ max-num-generation
 max-num-generation
 0
 2000
-500.0
+200.0
 100
 1
 NIL
@@ -456,7 +457,7 @@ tick-per-generation
 tick-per-generation
 300
 1000
-500.0
+300.0
 100
 1
 NIL
@@ -549,39 +550,40 @@ PENS
 @#$#@#$#@
 ## WHAT IS IT?
 
-(a general understanding of what the model is trying to show or explain)
+In this modeled environment, the multiple robots that are performing package delivery actions are regarded as agents. Then the simulation will be ran on them, in order to yield the most meaningful and well-behaving agent. Once after selecting the robot agent with the highest fitness value, this will then be passed into the next generation. The mutation happens here, and the robotic "software" will be copied into the robots in the following generation.
 
 ## HOW IT WORKS
+The robotic agents have couple actions including: pick-up package, drop-off package, turn left and right, and move forward. Among these five actions, pick-up and drop-off actions are performed automatically once the robot passes through the package turtle agent and the drop-off zone patch agent. They will be rewarded for doing a desired action, but will be penalized if they did a wrong action such as bumping into a wall or other robots, and etc. An optimal action for reward includes: pick-up package, drop-off package, stop by charging stations, approaching toward pick-up area when the robot is package-free, and approaching toward drop-off area when the robot is carrying the package. The action choice is done based on the probability vector calculated by the cartesian genetic programming extension. The NetLogo model passes observation vectors of each robot into the Scala extension, and the extension decodes the cartesian network, and yields the predicted action array. This returned prediction is converted into cumulative distributed array for the ease of action choice -it will let the code to choose the highest probable action easily.
 
-(what rules the agents use to create the overall behavior of the model)
+Robotic agents mainly performing a task to pick up a package turtle agent and deliver it to the drop-off area which is composed with patch agents. Multiple robotic agents have an interaction with charging stations as well. At the end of each generation, the cartesian genetic program will evaluate the most well-performed robot and pass this gene to the next generation. The fitness value is evaluated by summing up the action reward that the robot receives after performing each action, and the remaining battery rate. The ratio of action reward is higher than the battery rate to put more weight or emphasis on robots' action than the long-lasting battery. After choosing a 'parent' robot with the fitness measure, the Scala extension mutates the cartesian network, and replicate this `robotic software' into the robots for the next generation. Once the generation changes, the package and charging station turtle agents will all cleared up and re-created in a random location as well.
 
 ## HOW TO USE IT
-
-(how to use the model, including a description of each of the items in the Interface tab)
+1. Set the cartesian genetic program's parameters: NUM-INPUT, NUM-OUTPUT, NUM-ARITY, NUM-LV-BACK, NUM-ROW, NUM-COL, and MUTATION-RATE. These parameters allow to create the cartesian genetic network, with the desired mutation rate later on.
+2. Set the slider values for the simulation: INITIAL-NUM-ROBOT, INITIAL-NUM-PACKAGE, INITIAL-NUM-CHARGER, TICK-PER-GENERATION, and MAX-NUM-GENERATION. These parameters set the number of patches that the user would like to set up, and controls the tick.
+3. Press "setup" and "go" to run the experiment.
+4. Examine monitors and plots: Generation, Average Fitness Per Generation, and Population Per Generation. The Generation monitor shows that at which generation the simulation is currently at. The average fitness value plot has the average fitness measure value for each generation. As the time goes, it is expected to increase. The population plot shows how many correct actions (pick-up, drop-off, and stop by charging station) are performed on the turtle agents. Especially the drop-off numbers should be growing as the generation goes.
 
 ## THINGS TO NOTICE
-
-(suggested things for the user to notice while running the model)
+- Although the agent learns slowly, you may notice that the agents are stopping by at the charging station after running for a couple generation. They initailly ignored the charging station and moved randomly. Now after giving agents reward for stoppying by, the agent learned that it is beneficial for them to stop by.
+- As the agent learns, they started to form a circle and circulating around. The hands-free robots tend to move to the right side where packages are located, and the occupied robots are moving to the left side where the drop-off zone is located. They are circulating and moving to the appropriate side at the same time.
 
 ## THINGS TO TRY
-
-(suggested things for the user to try to do (move sliders, switches, etc.) with the model)
+Try to reduce the tick-per-generation into the minimum and increase it to the maximum. And see how the average fitness value and the number of rewarded actions are different. The longer the exposure, the higher the learning rate.
 
 ## EXTENDING THE MODEL
-
-(suggested things to add or change in the Code tab to make the model more complicated, detailed, accurate, etc.)
+- Try to incorporate a Q-learning model into this environment, and see how fast it learns compared to the cartesian genetic programming model.
+- Try to change the reward values of robots, and see how the learning rate changes.
 
 ## NETLOGO FEATURES
-
-(interesting or unusual features of NetLogo that the model uses, particularly in the Code tab; or where workarounds were needed for missing features)
+Turtle agents include robot, charging station, and package. There are patch agents as well, which are walls, pick-up and drop-off zones. These different types of NetLogo agents allows the robot to compose an observation vector easily.
 
 ## RELATED MODELS
+The following model also uses the genetic algorithm to train the robot to pick up the trash can in the world.
 
-(models in the NetLogo Models Library and elsewhere which are of related interest)
+- Mitchell, M., Tisue, S. and Wilensky, U. (2012). NetLogo Robby the Robot model. http://ccl.northwestern.edu/netlogo/models/RobbytheRobot. Center for Connected Learning and Computer-Based Modeling, Northwestern University, Evanston, IL.
 
 ## CREDITS AND REFERENCES
-
-(a reference to the model's URL on the web if it has one, as well as any other necessary credits, citations, and links)
+- Wilensky, U. (1999). NetLogo. http://ccl.northwestern.edu/netlogo/. Center for Connected Learning and Computer-Based Modeling, Northwestern University, Evanston, IL.
 @#$#@#$#@
 default
 true
@@ -944,6 +946,49 @@ NetLogo 6.2.0
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
+<experiments>
+  <experiment name="experiment" repetitions="1" runMetricsEveryStep="true">
+    <setup>setup</setup>
+    <go>go</go>
+    <metric>reward-action</metric>
+    <enumeratedValueSet variable="tick-per-generation">
+      <value value="300"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="num-input">
+      <value value="10"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="num-lv-back">
+      <value value="15"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="initial-num-robot">
+      <value value="30"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="initial-num-charger">
+      <value value="3"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max-num-generation">
+      <value value="200"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="initial-num-package">
+      <value value="50"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="num-row">
+      <value value="15"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="mutation-rate">
+      <value value="0.05"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="num-arity">
+      <value value="2"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="num-output">
+      <value value="3"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="num-col">
+      <value value="15"/>
+    </enumeratedValueSet>
+  </experiment>
+</experiments>
 @#$#@#$#@
 @#$#@#$#@
 default
