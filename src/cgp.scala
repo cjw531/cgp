@@ -251,17 +251,17 @@ class cgp extends api.DefaultClassManager {
 
     // remake nodes by certain probability
     var flag_changed = false
-    while (flag_changed == false) {
-      if (num_iterations >= num_ticks_to_stop_forced_mutation) {
-        flag_changed = true
-      }
+//    while (flag_changed == false) {
+//      if (num_iterations >= num_ticks_to_stop_forced_mutation) {
+//        flag_changed = true
+//      }
       var last_node_number_in_column = mutated_cgp.num_inputs - 1
       var row_counter = 1
       for (node_idx <- 0 to (mutated_cgp.node_list.length - 1) + mutated_cgp.num_outputs) {
         //        println(node_idx)
         if (node_idx > mutated_cgp.node_list.length - 1) {
           var output_idx = node_idx - mutated_cgp.node_list.length
-          val prob = r.nextDouble * 100
+          val prob = r.nextDouble * 10
           if (prob <= mutation_rate) {
             flag_changed = true
             mutated_cgp.set_output_connection(r.nextInt(mutated_cgp.num_inputs + (mutated_cgp.num_rows*mutated_cgp.num_cols) - 1), output_idx)
@@ -269,7 +269,7 @@ class cgp extends api.DefaultClassManager {
         }
         else {
           var node = mutated_cgp.node_list(node_idx)
-          val prob = r.nextDouble * 100
+          val prob = r.nextDouble * 10
           if (prob <= mutation_rate) {
             flag_changed = true // mark that a change was made
             // alter an entire node (alter incoming edges and function)
@@ -286,7 +286,7 @@ class cgp extends api.DefaultClassManager {
         }
         row_counter += 1
       }
-    }
+//    }
 
     // compute active nodes
     mutated_cgp.find_active_nodes()
