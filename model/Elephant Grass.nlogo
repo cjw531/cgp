@@ -1,5 +1,7 @@
 extensions [cgp]
 
+globals [grass-consumed]
+
 elephants-own [energy age]
 patches-own [countdown]
 
@@ -9,6 +11,7 @@ breed [elephants elephant]
 to setup
   clear-all
   reset-ticks
+
 
   create-elephants num-elephants [
     setxy random-xcor random-ycor
@@ -30,6 +33,9 @@ to setup
         set countdown random (grass-regrowth-time * 5)
       ]
   ]
+
+  set grass-consumed count patches with [pcolor = green]
+  show grass-consumed
 end
 
 
@@ -108,9 +114,12 @@ to go
   ]
 
   if count elephants = 0 [ stop ]
+
+
+  set grass-consumed (grass-consumed + count patches with [pcolor = green])
+
   tick
 end
-
 
 to eat
   if pcolor = green [
@@ -380,6 +389,24 @@ mutation-diff-percent
 1
 NIL
 HORIZONTAL
+
+PLOT
+1042
+171
+1411
+463
+Grass Presence per 1000 ticks
+Ticks
+Grass Amount
+0.0
+10.0
+0.0
+10.0
+true
+false
+"" ""
+PENS
+"grass-consumed" 0.0 0 -16777216 true "" "if ticks mod 1000 = 0 [\nplotxy ticks (grass-consumed / 1000)\nset grass-consumed 0\n]"
 
 @#$#@#$#@
 ## WHAT IS IT?
@@ -795,6 +822,36 @@ NetLogo 6.2.0
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
+<experiments>
+  <experiment name="measure-grass-consumption" repetitions="1" runMetricsEveryStep="true">
+    <setup>setup
+let grass-consumed 0</setup>
+    <go>go</go>
+    <metric>set grass-consumed (grass-consumed + count patches with [pcolor = green])</metric>
+    <metric>if tick mod 1000 = 0 [</metric>
+    <metric>report (grass-consumed / 1000)</metric>
+    <metric>set grass-consumed 0</metric>
+    <metric>]</metric>
+    <enumeratedValueSet variable="mutation-diff-percent">
+      <value value="0.04"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="num-elephants">
+      <value value="50"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="elephant-gain-from-food">
+      <value value="6"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="max-age">
+      <value value="450"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="grass-regrowth-time">
+      <value value="280"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="busses-reproduce">
+      <value value="2"/>
+    </enumeratedValueSet>
+  </experiment>
+</experiments>
 @#$#@#$#@
 @#$#@#$#@
 default

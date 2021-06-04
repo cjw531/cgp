@@ -3,7 +3,7 @@ extensions [cgp]
 globals [generation]
 
 elephants-own [energy age]
-poachers-own [economy cooldown]
+poachers-own [economy cooldown is-bankrupt]
 dead-elephants-own [age]
 patches-own [countdown trap trap-age]
 
@@ -23,18 +23,19 @@ to setup
     set shape "elephant"
     set size 4.5
     set energy 100
-    cgp:add-cgps 21 3 32 21 32 ;; inputs outputs lvls rows cols
+    cgp:add-cgps 15 3 20 10 10 ;; inputs outputs lvls rows cols
     ;; do 21 105 1:5 ratio
     set age 1
   ]
 
   create-poachers num-poachers [
-    setxy random-xcor random-ycor
+;    setxy random-xcor random-ycor
+    setxy 0 0
     set shape "poacher"
     set color black
     set size 3.0
-    set economy 0
-    cgp:add-cgps 21 3 32 21 32
+    set economy 1000
+    cgp:add-cgps 9 3 10 10 10
     set heading 0
   ]
 
@@ -53,7 +54,7 @@ end
 
 to go
   ask elephants [
-    let obs get-observations
+    let obs get-observations-elephants
     let action-vector cgp:get-action obs
     ;; format action-vector to be probabilities
     set action-vector (map abs action-vector)
@@ -89,12 +90,12 @@ to go
       n < (item 1 cum-sum) [
         ;; do second action
         lt 20
-        set energy energy - 0.1
+        set energy energy - 0.2
       ]
       n <= (item 2 cum-sum) [
         ;; do third action
         rt 20
-        set energy energy - 0.1
+        set energy energy - 0.2
       ]
       [
         ;; else should never come here
@@ -116,18 +117,67 @@ to go
   ]
 
   ask poachers [
-     lt random 20
-     rt random 20
-     fd 0.2
-     check-for-dead-elephant
-     kill-elephant
-     ifelse cooldown = 0  [
+
+    ifelse is-bankrupt = 1 [
+
+    ]
+    [
+    ;;; if only one elephant left then do nothing
+    let obs get-observations-poachers
+    let action-vector cgp:get-action obs
+    ;; format action-vector to be probabilities
+    set action-vector (map abs action-vector)
+    let total (sum action-vector)
+    ifelse total > 0 [
+      set action-vector (map [i -> i / total] action-vector)
+    ]
+    [
+      set action-vector (map [i -> i * 0] action-vector)
+    ]
+
+    ifelse action-vector = (list 0 0 0)
+    [
+      fd 0.2
+    ]
+    [
+      ;; get cumulative sums
+      let cum-sum (list)
+      set cum-sum lput (item 0 action-vector) cum-sum
+      set cum-sum lput (item 0 action-vector + item 1 action-vector) cum-sum
+      set cum-sum lput (item 1 cum-sum + item 2 action-vector) cum-sum
+
+      ;      show action-vector
+
+      let n random-float sum action-vector
+
+      (ifelse n < (item 0 cum-sum) [
+        ;; do first action
+        fd 0.2
+        ]
+        n < (item 1 cum-sum) [
+          ;; do second action
+          lt 20
+        ]
+        n <= (item 2 cum-sum) [
+          ;; do third action
+          rt 20
+        ]
+        [
+          ;; else should never come here
+          print "Should not be here"
+      ])
+    ]
+    check-for-dead-elephant
+    kill-elephant
+    ifelse cooldown = 0  [
       place-trap
-     ]
-     [
+    ]
+    [
       set cooldown cooldown - 1
-     ]
-     check-bankrupt
+    ]
+    set economy economy - 2
+    check-bankrupt
+    ]
   ]
 
 
@@ -154,18 +204,19 @@ to new-gen-poachers
   set generation generation + 1
   let best-poacher one-of (poachers with-max [economy])
   if best-poacher != nobody [
-    ask poachers with [who != [who] of best-poacher] [die ]
-    repeat num-poachers [
-      create-poachers 1 [
-        setxy ([xcor] of best-poacher) ([ycor] of best-poacher)
+    ask poachers with [who != [who] of best-poacher] [cgp:clear-cgp die]
+    create-poachers (4) [
+      setxy ([xcor] of best-poacher ) ([ycor] of best-poacher)
         set shape "poacher"
         set color black
         set size 3.0
-        cgp:mutate-reproduce best-poacher mutation-diff-percent
-        set economy 0
+        cgp:mutate-reproduce best-poacher  mutation-diff-percent max-ticks-force-mutate ticks
+        set economy 1000
+        set is-bankrupt 0
         set cooldown trap-cooldown
-      ]
+      show-turtle
     ]
+    ask best-poacher [set economy 0 set is-bankrupt 0 show-turtle]
   ]
 end
 
@@ -217,11 +268,11 @@ to eat
 end
 
 
-to-report get-observations
+to-report get-observations-elephants
   let obs []
   rt 30
   repeat 3 [
-    set obs sentence obs (get-in-cone 7 20)
+    set obs sentence obs (get-in-cone-elephants 7 20)
     lt 20
   ]
   rt 30
@@ -229,7 +280,53 @@ to-report get-observations
   report obs
 end
 
-to-report get-in-cone [dist angle]
+to-report get-observations-poachers
+  let obs []
+  rt 30
+  repeat 3 [
+    set obs sentence obs (get-in-cone-poachers 7 20)
+    lt 20
+  ]
+  rt 30
+  set obs map [i -> i / 7] obs
+  report obs
+end
+
+to-report get-in-cone-poachers [dist angle]
+  let obs []
+  let cone other turtles in-cone dist angle
+  let el min-one-of cone with [is-elephant? self] [distance myself]
+  if-else el = nobody [
+    set obs lput 0 obs
+  ]
+  [
+    set obs lput (7 - ((distance el) / 2)) obs
+  ]
+  let poach min-one-of cone with [is-poacher? self] [distance myself]
+  if-else poach = nobody [
+    set obs lput 0 obs
+  ]
+  [
+    set obs lput (7 - ((distance poach) / 2)) obs
+  ]
+;  let ytrap min-one-of patches in-cone (dist) (angle) with [trap = 1] [distance myself]
+;  if-else ytrap = nobody [
+;    set obs lput 0 obs
+;  ]
+;  [
+;    set obs lput (7 - ((distance ytrap) / 2)) obs
+;  ]
+  let ded-elf min-one-of cone with [is-dead-elephant? self] [distance myself]
+  if-else ded-elf = nobody [
+    set obs lput 0 obs
+  ]
+  [
+    set obs lput (7 - ((distance ded-elf) / 2)) obs
+  ]
+  report obs
+end
+
+to-report get-in-cone-elephants [dist angle]
   let obs []
   let cone other turtles in-cone dist angle
   let el min-one-of cone with [is-elephant? self] [distance myself]
@@ -267,13 +364,6 @@ to-report get-in-cone [dist angle]
   [
     set obs lput (7 - ((distance ytrap) / 2)) obs
   ]
-  let ded-elf min-one-of cone with [is-dead-elephant? self] [distance myself]
-  if-else ded-elf = nobody [
-    set obs lput 0 obs
-  ]
-  [
-    set obs lput (7 - ((distance ded-elf) / 2)) obs
-  ]
   report obs
 end
 
@@ -301,7 +391,7 @@ to reproduce
     set energy (energy / 2)               ; divide energy between parent and offspring
     hatch 1 [
       rt random-float 360 fd 1
-      cgp:mutate-reproduce myself mutation-diff-percent
+      cgp:mutate-reproduce myself mutation-diff-percent max-ticks-force-mutate ticks
       set age 1
     ]  ; hatch an offspring and move it forward 1 step
   ]
@@ -311,7 +401,7 @@ to check-for-dead-elephant
   if any? dead-elephants-on patch-here
   [
     ask dead-elephants-on patch-here [die]
-   set economy economy + cost-to-lay-trap
+   set economy economy + (price-of-ivory - cost-to-lay-trap)
   ]
 end
 
@@ -321,7 +411,7 @@ to check-death
 end
 
 to check-bankrupt
-  if economy < 0 [cgp:clear-cgp die]
+  if economy <= 0 [set is-bankrupt 1 hide-turtle]
 end
 
 
@@ -623,7 +713,7 @@ num-poachers
 num-poachers
 0
 100
-3.0
+35.0
 1
 1
 NIL
@@ -776,10 +866,10 @@ max [age] of elephants
 11
 
 SLIDER
-427
-198
-621
-231
+245
+296
+439
+329
 mutation-diff-percent
 mutation-diff-percent
 0
@@ -791,10 +881,10 @@ NIL
 HORIZONTAL
 
 SWITCH
-454
-240
-590
-273
+272
+338
+408
+371
 shoot-to-kill
 shoot-to-kill
 1
@@ -802,21 +892,21 @@ shoot-to-kill
 -1000
 
 MONITOR
-259
-235
-329
-280
-Economy
+234
+231
+323
+276
+Max Economy
 max [economy] of poachers
 17
 1
 11
 
 SLIDER
-224
-303
-396
-336
+227
+168
+399
+201
 max-trap-age
 max-trap-age
 50
@@ -851,7 +941,7 @@ cost-to-murder-elephant
 cost-to-murder-elephant
 2000
 10000
-8000.0
+5000.0
 100
 1
 NIL
@@ -873,10 +963,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-300
-408
-503
-441
+403
+504
+606
+537
 time-to-decompose-carcass
 time-to-decompose-carcass
 50
@@ -886,6 +976,50 @@ time-to-decompose-carcass
 1
 NIL
 HORIZONTAL
+
+PLOT
+1156
+160
+1498
+515
+Poacher Economy
+Tick
+Economy
+0.0
+10.0
+0.0
+10.0
+true
+false
+"" ""
+PENS
+"poachers" 1.0 0 -16777216 true "" "plot mean [economy] of poachers"
+
+SLIDER
+435
+245
+614
+278
+max-ticks-force-mutate
+max-ticks-force-mutate
+1000
+40000
+25000.0
+1000
+1
+NIL
+HORIZONTAL
+
+MONITOR
+333
+230
+406
+275
+Mean Econ
+mean [economy] of poachers
+17
+1
+11
 
 @#$#@#$#@
 ## WHAT IS IT?
