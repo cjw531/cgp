@@ -21,8 +21,10 @@ to setup
   clear-all
   reset-ticks
 
-  set do-poach 0
+  set do-poach 0 ;; initially there is no poaching
 
+
+  ;; create the elephants in the model with CGPs embedded into them
   create-elephants num-elephants [
     setxy random-xcor random-ycor
     set color gray + 2
@@ -33,6 +35,7 @@ to setup
     set age 1
   ]
 
+  ;; Randomly create brown and green patches and set countdown times
   ask patches [
       set pcolor one-of [ green brown ]
       ifelse pcolor = green
@@ -44,11 +47,15 @@ to setup
       ]
   ]
 
+  ;; count the number of patches that are green
   set grass-consumed count patches with [pcolor = green]
+
+  ;; initialize global variables for starting values
   set adaptive-new-poacher-rate 1
   set total-poachers-killed 0
 end
 
+;; Activates poaching in which poachers hunt elephant and rangers protect the elephants
 to start-poaching
   clear-all-plots
   set do-poach 1
@@ -76,11 +83,12 @@ end
 
 to go
   ask elephants [
-    let obs get-observations
-    let action-vector cgp:get-action obs
+    let obs get-observations ;; extract observations from current view space
+    let action-vector cgp:get-action obs ;; get output from embedded CGP using extension
     ;; format action-vector to be probabilities
     set action-vector (map abs action-vector)
     let total (sum action-vector)
+    ;; protected division
     ifelse total > 0 [
       set action-vector (map [i -> i / total] action-vector)
     ]
@@ -99,26 +107,26 @@ to go
       set cum-sum lput (item 0 action-vector + item 1 action-vector) cum-sum
       set cum-sum lput (item 1 cum-sum + item 2 action-vector) cum-sum
 
+      ;; perform CDF for weighted probability
       let n random-float sum action-vector
 
       (ifelse n < (item 0 cum-sum) [
-        ;; do first action
+        ;; move forward
         fd 0.2
         set energy energy - 0.2
       ]
       n < (item 1 cum-sum) [
-        ;; do second action
+        ;; turn left
         lt 20
         set energy energy - 0.1
       ]
       n <= (item 2 cum-sum) [
-        ;; do third action
+        ;; turn right
         rt 20
         set energy energy - 0.1
       ]
       [
         ;; else should never come here
-          print "Should not be here"
       ])
     ]
     eat
@@ -166,6 +174,7 @@ to go
         ]
       ]
       fd 0.2
+      ;; depending on policy, punish poacher
       ifelse shoot-to-kill = true [
         kill-poacher
       ]
@@ -177,6 +186,7 @@ to go
     ]
 
     ask poachers [
+      ;; first look for dead elephants to extract tusk from
       let vision-dead-elephants dead-elephants in-cone 7 60
       let dead-elephant-to-go-to min-one-of vision-dead-elephants with [is-dead-elephant? self] [distance myself]
       ifelse dead-elephant-to-go-to != nobody [
@@ -190,12 +200,14 @@ to go
           face elephant-to-go-to
         ]
         [
+          ;; nothing interesting so move randomly
           rt random 20
           lt random 20
         ]
       ]
       fd 0.2
       check-for-dead-elephant
+      ;; don't make elephant population go extinct so that can still make money off ivory
       if count elephants > 1 [
         kill-elephant
         ifelse cooldown = 0  [
@@ -205,14 +217,14 @@ to go
           set cooldown cooldown - 1
         ]
       ]
-      set economy economy - 2
+      set economy economy - 2 ;; lose energy for taking an action
       check-retirement
       set poacher-age poacher-age + 1
       if economy > max-economy-recorded [
         set max-economy-recorded economy
       ]
     ]
-
+    ;; if trap has been around for too long
     ask traps [
       if trap-age > max-trap-age [
         die
@@ -223,6 +235,7 @@ to go
     set ticks-since-poaching ticks-since-poaching + 1
   ]
 
+  ;; Poachers come out of timeout
   ask inactive-poachers [
    if respawn-time < 0 [
       let prev-econ inactive-economy
@@ -247,6 +260,7 @@ to go
    grow-grass
   ]
 
+  ;; no elephants left in ecosystem
   if count elephants = 0 [ stop ]
 
   set grass-consumed (grass-consumed + count patches with [pcolor = green])
@@ -254,6 +268,7 @@ to go
   tick
 end
 
+;; check to see if poacher has surpassed age needed for retirement. new poacher is spawned then
 to check-retirement
   if poacher-age > (retirement-age * 10) [
     set total-econ-retirement total-econ-retirement + economy
@@ -272,6 +287,7 @@ to check-retirement
    ]
 end
 
+;; trap is placed if economy is high enough and a probability is met. cooldown is placed so poachers can't spam traps
 to place-trap
   if economy > 2000
   [
@@ -287,6 +303,7 @@ to place-trap
   ]
 end
 
+;; elephant checks if trap is here and dies if so
 to check-trap
   if any? traps-here [
     ask traps-on patch-here [die]
@@ -301,6 +318,7 @@ to check-trap
   ]
 end
 
+;; poacher is arrested when shoot to kill strategy is off. inactive poacher is created based off the poacher
 to arrest-poacher
   let victim one-of poachers in-radius 2
   if victim != nobody [
@@ -314,6 +332,7 @@ to arrest-poacher
   ]
 end
 
+;; poacher is killed when shoot to kill strategy is on. inactive poacher is created in default settings and reset when time is up
 to kill-poacher
   ;; if shoot to kill, then will kill and economy will be 0'd
   ;; if not shoot to kill, then will subtract from economy and put in timeout
@@ -332,6 +351,7 @@ to kill-poacher
   ]
 end
 
+;; ranger removes a trap
 to remove-trap
  let trap-to-remove one-of traps-here
  if trap-to-remove != nobody [
@@ -339,6 +359,7 @@ to remove-trap
  ]
 end
 
+;; ranger removes a carcass
 to remove-carcass
  let carcass-to-remove one-of dead-elephants-here
  if carcass-to-remove != nobody [
@@ -346,6 +367,7 @@ to remove-carcass
  ]
 end
 
+;; poacher kills an elephant and gains economy from it
 to kill-elephant
   let prey one-of elephants-here
   if prey != nobody [
@@ -354,6 +376,7 @@ to kill-elephant
   ]
 end
 
+;; poacher extracts ivory from carcass of elephant that was killed from trap
 to check-for-dead-elephant
   if any? dead-elephants-on patch-here
   [
@@ -362,6 +385,7 @@ to check-for-dead-elephant
   ]
 end
 
+;; elephant consumes grass, turning patch from green to brown
 to eat
   if pcolor = green [
     set pcolor brown
@@ -369,7 +393,7 @@ to eat
   ]
 end
 
-
+;; gets observation of elephant agent which includes its cone of vision in three different cones
 to-report get-observations
   let obs []
   rt 30
@@ -382,33 +406,35 @@ to-report get-observations
   report obs
 end
 
+;; put observations into list to then feed into CGP. Adds in information regarding elephants, green patches, and brown patches
 to-report get-in-cone [dist angle]
   let obs []
   let cone other turtles in-cone dist angle
   let el min-one-of cone with [is-elephant? self] [distance myself]
   if-else el = nobody [
-    set obs lput 0 obs
+    set obs lput 0 obs ;; doesn't exist, so 0
   ]
   [
-    set obs lput (7 - ((distance el) / 2)) obs
+    set obs lput (7 - ((distance el) / 2)) obs ;; distance between myself and green patch
   ]
   let pag min-one-of patches in-cone (dist) (angle) with [pcolor = green] [distance myself]
   if-else pag = nobody [
-    set obs lput 0 obs
+    set obs lput 0 obs ;; doesn't exist, so 0
   ]
   [
-    set obs lput (7 - ((distance pag) / 2)) obs
+    set obs lput (7 - ((distance pag) / 2)) obs ;; distance between myself and other elephant
   ]
   let pab min-one-of patches in-cone (dist) (angle) with [pcolor = brown] [distance myself]
   if-else pab = nobody [
-    set obs lput 0 obs
+    set obs lput 0 obs ;; doesn't exist, so 0
   ]
   [
-    set obs lput (7 - ((distance pab) / 2)) obs
+    set obs lput (7 - ((distance pab) / 2)) obs ;; distance between myself and brown patch
   ]
   report obs
 end
 
+;; Patches grow grass based on a countdown
 to grow-grass
   if pcolor = brown [
    ifelse countdown <= 0
@@ -422,21 +448,20 @@ to grow-grass
   ]
 end
 
+;; in here, mutate to generate an offspring
 to reproduce
-  ;; in here, mutate to generate an offspring
   if energy > 200 [
-    set energy (energy / 2)               ; divide energy between parent and offspring
+    set energy (energy / 2); divide energy between parent and offspring
     hatch 1 [
       rt random-float 360 fd 1
       cgp:mutate-reproduce myself mutation-diff-percent
       set age 1
-    ]  ; hatch an offspring and move it forward 1 step
+    ]  ; hatch an offspring and set its age to 1
   ]
 end
 
-
+;; if an elephant drops below 0 energy, die
 to check-death
-;  if age > max-age [cgp:clear-cgp die]
   if energy < 0 [cgp:clear-cgp die]
 end
 @#$#@#$#@
@@ -879,7 +904,7 @@ new-poacher-time-after-kill
 new-poacher-time-after-kill
 1
 200
-65.0
+10.0
 1
 1
 NIL
@@ -940,41 +965,73 @@ HORIZONTAL
 @#$#@#$#@
 ## WHAT IS IT?
 
-Elephants, Poacher, Ranger model where poachers kill elephants and rangers kill poachers
+This model explores an ecosystem in which poachers are hunting elephants and rangers are protecting the elephants. Elephants are fitted with a cartesian genetic programming network that helps them choose the action to take, poachers lay traps and seek to kill elephants, and rangers remove traps and punish the poachers dependening on the policy applied.
 
 ## HOW IT WORKS
 
-Agents call the cgp extension to get their next best action.
+Elephants call the cgp extension to get their next best action and aim to stay alive by consuming grass, which gains energy. Elephants lose energy after each movement. When elephants run out of energy, they die. Grass regrows at a specified rate and is generated randomly by the patches. Poachers lay traps and seek to kill elephants, and rangers protect elephants by removing traps and either arresting or killing poachers based on whether the shoot to kill policy is activated. 
+
+The rules for elephants, grass, and poachers acts the same as the other models specified. Rangers, in order, check for elephants and poachers in the same vision cone to then arrest or kill the poacher (caught in the act), check for traps to pick up, check for dead elephants to pick up, and otherwise move around randomly. This rule-set is created to mirror natural tendencies in which the most important is to prevent elephants from dying. Such if they catch a poacher in the act, they do everything in their power to protect the elephant. 
+
+If the shoot to kill policy is activated, rangers kill the poacher and a new poacher is spawned after a cooldown time. This cooldown time is adaptive and increases every time a poacher is killed. The idea behind this is that poachers would hear news about one of their own being killed and so it would take some time for a new one to come in and join the poaching effort. As news spreads of more and more poachers being killed, new poachers are less and less likely to come. 
+
+If the shoot to kill policy is not activated, rangers arrest the poacher and the poacher goes into a 'timeout' in which its economy is lowered and it returns after a time defined by a parameter. 
+
+Poachers 
 
 ## HOW TO USE IT
 
-num-elephants: number of elephants to create intiially 
-num-rangers: number of rangers to create initially
-num-poachers: number of poachers to create initially
+1. Adjust the slider parameters (see below), of use the default settings. 
+2. Press the SETUP button 
+3. Press the GO button to begin the simulation of the elephants grass model 
+4. Press the START-POACHING button once ready for the poachers to start hunting 
+5. Look at the monitors and plots to view the current population size of the elephants and the economy of the poachers.
+ 
+num-elephants: Number of elephants to start with 
+elephant-gain-from-food: Amount of energy gained from consuming grass 
+grass-regrowth-time: Countdown at which grass grows again 
+mutation-diff-percent: Probability at which a node can be re-made during mutation 
+num-poachers: Number of poachers to start with 
+prob-set-trap: Probability of a poacher setting a trap
+max-trap-age: Maximum age before a trap disappears 
+trap-cooldown: Time before a poacher can place a trap again
+retirement age: Age at which a poacher 'retires'
+price-of-ivory: Defined price of ivory (total per elephant)
+cost-to-murder-elephant: Cost needed to hunt and kill an elephant 
+cost-to-lay-trap: Cost needed to place a trap 
+time-to-decompose-carcass: How long it takes for a dead elephant to decompose
+num-rangers: Number of rangers in model 
+new-poacher-time-after-kill: Time it takes for poacher to respawn after being kill under shoot to kill being true 
+cost-of-jail: Amount economy is lowered for poacher after being arrested 
+jail-time: Time poacher spends in jail before coming back to poach
+shoot-to-kill: Toggles if shoot to kill policy is applied
 
 ## THINGS TO NOTICE
 
-(suggested things for the user to notice while running the model)
+Notice that the elephants are learning via a CGP and as such, the longer they stay alive while the poachers are present, the more they learn to avoid them and stay alive. 
 
 ## THINGS TO TRY
 
-(suggested things for the user to try to do (move sliders, switches, etc.) with the model)
+Try playing around with the mutation rate as well as trying to limit the population of the elephants to potentially help them learn faster or slower. 
 
 ## EXTENDING THE MODEL
 
-(suggested things to add or change in the Code tab to make the model more complicated, detailed, accurate, etc.)
+Simplifications for this model include rangers instantly being able to break traps, rangers not being trampled by elephants, and rangers continuously monitoring the area. 
+
+Extensions could be created based on these.
 
 ## NETLOGO FEATURES
 
-(interesting or unusual features of NetLogo that the model uses, particularly in the Code tab; or where workarounds were needed for missing features)
+Note the use of the patches to model grass
 
 ## RELATED MODELS
 
-(models in the NetLogo Models Library and elsewhere which are of related interest)
 
 ## CREDITS AND REFERENCES
 
-(a reference to the model's URL on the web if it has one, as well as any other necessary credits, citations, and links)
+Wilensky, U., & Rand, W. (2015). An introduction to agent-based modeling: Modeling natural, social and engineered complex systems with NetLogo. Cambridge, MA: MIT Press.
+
+Miller, Julian F. "Cartesian genetic programming." Cartesian Genetic Programming. Springer, Berlin, Heidelberg, 2011. 17-34.
 @#$#@#$#@
 default
 true
