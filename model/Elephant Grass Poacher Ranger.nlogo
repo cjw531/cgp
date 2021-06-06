@@ -1,15 +1,18 @@
 extensions [cgp]
 
-globals [grass-consumed ticks-since-poaching do-poach total-econ-retirement total-retired max-economy-recorded]
+globals [grass-consumed ticks-since-poaching do-poach total-econ-retirement total-retired max-economy-recorded adaptive-new-poacher-rate total-poachers-killed total-econ-poachers-before-death]
 
 elephants-own [energy age]
 patches-own [countdown]
 poachers-own [economy cooldown poacher-age]
+inactive-poachers-own [respawn-time inactive-economy inactive-age]
 traps-own [trap-age]
 dead-elephants-own [age]
 
 breed [elephants elephant]
 breed [poachers poacher]
+breed [inactive-poachers inactive-poacher]
+breed [rangers ranger]
 breed [traps a-trap]
 breed [dead-elephants dead-elephant]
 
@@ -19,7 +22,6 @@ to setup
   reset-ticks
 
   set do-poach 0
-
 
   create-elephants num-elephants [
     setxy random-xcor random-ycor
@@ -43,6 +45,8 @@ to setup
   ]
 
   set grass-consumed count patches with [pcolor = green]
+  set adaptive-new-poacher-rate 1
+  set total-poachers-killed 0
 end
 
 to start-poaching
@@ -59,6 +63,13 @@ to start-poaching
     set economy (cost-to-lay-trap + cost-to-murder-elephant)
     set heading 0
     set poacher-age 1
+  ]
+  create-rangers num-rangers [
+    setxy random-xcor random-ycor
+    set shape "ranger"
+    set color blue
+    set size 3.0
+    set heading 0
   ]
 end
 
@@ -124,6 +135,47 @@ to go
       set age age + 1
     ]
 
+    ask rangers [
+     ;; search first for poachers in the act of killing elephants
+      let vision-elephants elephants in-cone 7 60
+      let vision-poachers poachers in-cone 7 60
+      let elephant-to-save min-one-of vision-elephants with [is-elephant? self] [distance myself]
+      let poacher-to-kill min-one-of vision-poachers with [is-poacher? self] [distance myself]
+      ifelse elephant-to-save != nobody and poacher-to-kill != nobody [
+       ;; poacher is caught in act of poaching, so either kill or arrest it
+       face poacher-to-kill
+      ]
+      [
+        ;; pick up a trap
+        let vision-traps traps in-cone 7 60
+        let trap-to-break min-one-of vision-traps with [is-a-trap? self] [distance myself]
+        ifelse trap-to-break != nobody [
+          face trap-to-break
+        ]
+        [
+          ;; clean up dead carcass
+          let vision-dead-elephants dead-elephants in-cone 7 60
+          let dead-elephant-to-go-to min-one-of vision-dead-elephants with [is-dead-elephant? self] [distance myself]
+          ifelse dead-elephant-to-go-to != nobody [
+           face dead-elephant-to-go-to
+          ]
+          [
+            lt random 20
+            rt random 20
+          ]
+        ]
+      ]
+      fd 0.2
+      ifelse shoot-to-kill = true [
+        kill-poacher
+      ]
+      [
+       arrest-poacher
+      ]
+      remove-trap
+      remove-carcass
+    ]
+
     ask poachers [
       let vision-dead-elephants dead-elephants in-cone 7 60
       let dead-elephant-to-go-to min-one-of vision-dead-elephants with [is-dead-elephant? self] [distance myself]
@@ -171,12 +223,31 @@ to go
     set ticks-since-poaching ticks-since-poaching + 1
   ]
 
+  ask inactive-poachers [
+   if respawn-time < 0 [
+      let prev-econ inactive-economy
+      let prev-age inactive-age
+      hatch-poachers 1[
+        set hidden? false
+        set shape "poacher"
+        set color black
+        set size 3.0
+        set economy prev-econ
+        set heading 0
+        if shoot-to-kill = false [
+          set poacher-age prev-age
+        ]
+      ]
+      die
+    ]
+    set respawn-time respawn-time - 1
+  ]
+
   ask patches [
    grow-grass
   ]
 
   if count elephants = 0 [ stop ]
-
 
   set grass-consumed (grass-consumed + count patches with [pcolor = green])
 
@@ -196,6 +267,7 @@ to check-retirement
       set heading 0
       set poacher-age 1
     ]
+    set total-econ-poachers-before-death total-econ-poachers-before-death + economy
     die
    ]
 end
@@ -227,6 +299,51 @@ to check-trap
    cgp:clear-cgp
    die
   ]
+end
+
+to arrest-poacher
+  let victim one-of poachers in-radius 2
+  if victim != nobody [
+    hatch-inactive-poachers 1 [
+      set respawn-time jail-time
+      set inactive-economy ([economy] of victim - cost-of-jail)
+      set inactive-age ([poacher-age] of victim)
+      set hidden? true
+    ]
+    ask victim [die]
+  ]
+end
+
+to kill-poacher
+  ;; if shoot to kill, then will kill and economy will be 0'd
+  ;; if not shoot to kill, then will subtract from economy and put in timeout
+;  let victim one-of poachers-here
+  let victim one-of poachers in-radius 2
+  if victim != nobody [
+    set total-poachers-killed total-poachers-killed + 1
+    set adaptive-new-poacher-rate adaptive-new-poacher-rate + 0.2
+    hatch-inactive-poachers 1 [
+      set respawn-time (new-poacher-time-after-kill * adaptive-new-poacher-rate)
+      set inactive-economy (cost-to-murder-elephant + cost-to-lay-trap)
+      set hidden? true
+    ]
+    set total-econ-poachers-before-death total-econ-poachers-before-death + ([economy] of victim)
+    ask victim [die]
+  ]
+end
+
+to remove-trap
+ let trap-to-remove one-of traps-here
+ if trap-to-remove != nobody [
+    ask trap-to-remove [die]
+ ]
+end
+
+to remove-carcass
+ let carcass-to-remove one-of dead-elephants-here
+ if carcass-to-remove != nobody [
+    ask carcass-to-remove [die]
+ ]
 end
 
 to kill-elephant
@@ -324,10 +441,10 @@ to check-death
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-661
-15
-1191
-546
+796
+18
+1326
+549
 -1
 -1
 15.82
@@ -557,9 +674,9 @@ SLIDER
 max-trap-age
 max-trap-age
 0
-100
-50.0
-1
+1000
+350.0
+10
 1
 NIL
 HORIZONTAL
@@ -588,7 +705,7 @@ prob-set-trap
 prob-set-trap
 0
 100
-5.0
+50.0
 1
 1
 NIL
@@ -603,7 +720,7 @@ trap-cooldown
 trap-cooldown
 0
 500
-80.0
+86.0
 1
 1
 NIL
@@ -655,10 +772,10 @@ NIL
 HORIZONTAL
 
 PLOT
-1199
-252
-1547
-543
+1351
+257
+1699
+548
 Poacher Mean Economy Upon Retirement
 Ticks
 Economy
@@ -726,6 +843,99 @@ max-economy-recorded
 4
 1
 11
+
+SLIDER
+612
+14
+784
+47
+num-rangers
+num-rangers
+0
+100
+6.0
+1
+1
+NIL
+HORIZONTAL
+
+SWITCH
+62
+291
+182
+324
+shoot-to-kill
+shoot-to-kill
+1
+1
+-1000
+
+SLIDER
+612
+56
+786
+89
+new-poacher-time-after-kill
+new-poacher-time-after-kill
+1
+200
+65.0
+1
+1
+NIL
+HORIZONTAL
+
+MONITOR
+648
+235
+773
+280
+NIL
+total-poachers-killed
+17
+1
+11
+
+MONITOR
+425
+182
+565
+227
+Poachers Econ Total mean
+total-econ-poachers-before-death / (total-poachers-killed + total-retired)
+4
+1
+11
+
+SLIDER
+613
+99
+785
+132
+cost-of-jail
+cost-of-jail
+0
+10000
+5000.0
+100
+1
+NIL
+HORIZONTAL
+
+SLIDER
+612
+142
+784
+175
+jail-time
+jail-time
+0
+60
+10.0
+1
+1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?

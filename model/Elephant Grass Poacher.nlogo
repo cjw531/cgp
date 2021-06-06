@@ -1,6 +1,6 @@
 extensions [cgp]
 
-globals [ticks-since-poaching do-poach total-econ-retirement total-retired]
+globals [grass-consumed ticks-since-poaching do-poach total-econ-retirement total-retired]
 
 elephants-own [energy age]
 poachers-own [economy cooldown is-bankrupt poacher-age]
@@ -26,18 +26,10 @@ to setup
     set shape "elephant"
     set size 4.5
     set energy 100
-    cgp:add-cgps 12 3 5 5 5 ;; inputs outputs lvls rows cols
+    cgp:add-cgps 15 3 32 21 32 ;; inputs outputs lvls rows cols
     ;; do 21 105 1:5 ratio
     set age 1
   ]
-
-;  create-traps 6 [
-;    set shape "trap"
-;    set color red
-;    setxy random-xcor random-ycor
-;    set size 3
-;    set trap-age 1
-;  ]
 
   create-poachers num-poachers [
     setxy random-xcor random-ycor
@@ -60,6 +52,7 @@ to setup
         set countdown random (grass-regrowth-time * 5)
       ]
   ]
+  set grass-consumed count patches with [pcolor = green]
 end
 
 to start-poaching
@@ -136,7 +129,20 @@ to go
   ]
 
   ask poachers [
-    ifelse do-poach = 0 [kill-elephant]
+    ifelse do-poach = 0 [
+      lt random 20
+      rt random 20
+      fd 0.2
+      check-for-dead-elephant
+      kill-elephant
+      ifelse cooldown = 0  [
+        place-trap
+      ]
+      [
+        set cooldown cooldown - 1
+      ]
+      check-bankrupt
+    ]
     [
       let vision-dead-elephants dead-elephants in-cone 7 60
       let dead-elephant-to-go-to min-one-of vision-dead-elephants with [is-dead-elephant? self] [distance myself]
@@ -175,14 +181,16 @@ to go
 
   if do-poach = 1 [
     set ticks-since-poaching ticks-since-poaching + 1
-    ask traps [
-      if trap-age > max-trap-age [
-        die
-      ]
-      set trap-age trap-age + 1
-    ]
   ]
 
+  ask traps [
+    if trap-age > max-trap-age [
+      die
+    ]
+    set trap-age trap-age + 1
+  ]
+
+  set grass-consumed (grass-consumed + count patches with [pcolor = green])
 
   ask patches [
    grow-grass
@@ -235,9 +243,7 @@ end
 
 to check-trap
   if any? traps-here [
-   if do-poach = 1 [
-      ask traps-on patch-here [die]
-   ]
+    ask traps-on patch-here [die]
   hatch-dead-elephants 1[
     set shape "dead-elephant"
     set color red
@@ -271,6 +277,13 @@ to-report get-in-cone-elephants [dist angle]
   [
     set obs lput (7 - ((distance el) / 2)) obs
   ]
+  let pab min-one-of patches in-cone (dist) (angle) with [pcolor = brown] [distance myself]
+  if-else pab = nobody [
+    set obs lput 0 obs
+  ]
+  [
+    set obs lput (7 - ((distance pab) / 2)) obs
+  ]
   let pag min-one-of patches in-cone (dist) (angle) with [pcolor = green] [distance myself]
   if-else pag = nobody [
     set obs lput 0 obs
@@ -301,7 +314,7 @@ to reproduce
     set energy (energy / 2)               ; divide energy between parent and offspring
     hatch 1 [
       rt random-float 360 fd 1
-      cgp:mutate-reproduce myself mutation-diff-percent ticks ticks
+      cgp:mutate-reproduce myself mutation-diff-percent
       set age 1
     ]  ; hatch an offspring and move it forward 1 step
   ]
@@ -443,7 +456,7 @@ elephant-gain-from-food
 elephant-gain-from-food
 0
 100
-6.0
+10.0
 1
 1
 NIL
@@ -477,7 +490,7 @@ grass-regrowth-time
 grass-regrowth-time
 100
 1000
-350.0
+260.0
 10
 1
 NIL
@@ -707,6 +720,24 @@ retirement-age
 1
 NIL
 HORIZONTAL
+
+PLOT
+284
+364
+613
+554
+Grass Consumption Per 1000 Ticks
+Ticks
+Grass Consumed
+0.0
+10.0
+0.0
+10.0
+true
+false
+"" ""
+PENS
+"grass consumed" 1.0 0 -16777216 true "" "if ticks mod 1000 = 0 [\nplotxy ticks (grass-consumed / 1000)\nset grass-consumed 0\n]\n"
 
 @#$#@#$#@
 ## WHAT IS IT?

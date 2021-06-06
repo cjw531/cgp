@@ -1,12 +1,11 @@
 extensions [cgp]
 
-globals [grass-consumed ticks-since-poaching do-poach total-econ-retirement total-retired max-economy-recorded]
+globals [grass-consumed generation]
 
 elephants-own [energy age]
-patches-own [countdown]
-poachers-own [economy cooldown poacher-age]
-traps-own [trap-age]
+poachers-own [economy cooldown]
 dead-elephants-own [age]
+patches-own [countdown trap trap-age]
 
 breed [elephants elephant]
 breed [poachers poacher]
@@ -18,17 +17,25 @@ to setup
   clear-all
   reset-ticks
 
-  set do-poach 0
-
-
   create-elephants num-elephants [
     setxy random-xcor random-ycor
     set color gray + 2
     set shape "elephant"
     set size 4.5
     set energy 100
-    cgp:add-cgps 9 3 10 12 24 ;; inputs outputs lvls rows cols
+    cgp:add-cgps 12 3 5 5 5 ;; inputs outputs lvls rows cols
+    ;; do 21 105 1:5 ratio
     set age 1
+  ]
+
+  create-poachers num-poachers [
+    setxy random-xcor random-ycor
+    set shape "poacher"
+    set color black
+    set size 3.0
+    set economy 0
+;    cgp:add-cgps 21 3 2 4 4
+    set heading 0
   ]
 
   ask patches [
@@ -45,23 +52,6 @@ to setup
   set grass-consumed count patches with [pcolor = green]
 end
 
-to start-poaching
-  clear-all-plots
-  set do-poach 1
-  set ticks-since-poaching 0
-  set total-retired 0
-  set total-econ-retirement 0
-  create-poachers num-poachers [
-    setxy random-xcor random-ycor
-    set shape "poacher"
-    set color black
-    set size 3.0
-    set economy (cost-to-lay-trap + cost-to-murder-elephant)
-    set heading 0
-    set poacher-age 1
-  ]
-end
-
 
 to go
   ask elephants [
@@ -76,6 +66,7 @@ to go
     [
       set action-vector (map [i -> i * 0] action-vector)
     ]
+
     ifelse action-vector = (list 0 0 0)
     [
       fd 0.2
@@ -87,6 +78,8 @@ to go
       set cum-sum lput (item 0 action-vector) cum-sum
       set cum-sum lput (item 0 action-vector + item 1 action-vector) cum-sum
       set cum-sum lput (item 1 cum-sum + item 2 action-vector) cum-sum
+
+;      show action-vector
 
       let n random-float sum action-vector
 
@@ -116,117 +109,44 @@ to go
     check-death
     set age age + 1
   ]
-  if do-poach = 1 [
-    ask dead-elephants [
-      if age > time-to-decompose-carcass [
-        die
-      ]
-      set age age + 1
-    ]
 
-    ask poachers [
-      let vision-dead-elephants dead-elephants in-cone 7 60
-      let dead-elephant-to-go-to min-one-of vision-dead-elephants with [is-dead-elephant? self] [distance myself]
-      ifelse dead-elephant-to-go-to != nobody [
-        face dead-elephant-to-go-to
-      ]
-      [
-        ;; no dead elephant to go to, so try and seek elephants
-        let vision-elephant elephants in-cone 7 60
-        let elephant-to-go-to min-one-of vision-elephant with [is-elephant? self] [distance myself]
-        ifelse elephant-to-go-to != nobody [
-          face elephant-to-go-to
-        ]
-        [
-          rt random 20
-          lt random 20
-        ]
-      ]
-      fd 0.2
-      check-for-dead-elephant
-      if count elephants > 1 [
-        kill-elephant
-        ifelse cooldown = 0  [
-          place-trap
-        ]
-        [
-          set cooldown cooldown - 1
-        ]
-      ]
-      set economy economy - 2
-      check-retirement
-      set poacher-age poacher-age + 1
-      if economy > max-economy-recorded [
-        set max-economy-recorded economy
-      ]
+  ask dead-elephants [
+    if age > time-to-decompose-carcass [
+      die
     ]
-
-    ask traps [
-      if trap-age > max-trap-age [
-        die
-      ]
-      set trap-age trap-age + 1
-    ]
-
-    set ticks-since-poaching ticks-since-poaching + 1
+    set age age + 1
   ]
 
-  ask patches [
-   grow-grass
+  ask poachers [
+     lt random 20
+     rt random 20
+     fd 0.2
+     check-for-dead-elephant
+     kill-elephant
+     ifelse cooldown = 0  [
+      place-trap
+     ]
+     [
+      set cooldown cooldown - 1
+     ]
+     check-bankrupt
   ]
-
-  if count elephants = 0 [ stop ]
-
 
   set grass-consumed (grass-consumed + count patches with [pcolor = green])
 
-  tick
-end
-
-to check-retirement
-  if poacher-age > (retirement-age * 10) [
-    set total-econ-retirement total-econ-retirement + economy
-    set total-retired total-retired + 1
-    hatch-poachers 1 [
-      setxy random-xcor random-ycor
-      set shape "poacher"
-      set color black
-      set size 3.0
-      set economy (cost-to-lay-trap + cost-to-murder-elephant)
-      set heading 0
-      set poacher-age 1
-    ]
-    die
-   ]
-end
-
-to place-trap
-  if economy > 2000
-  [
-    if random 100 < prob-set-trap and (any? traps-here = false) [
-      set cooldown trap-cooldown
-      set economy economy - cost-to-lay-trap
-      hatch-traps 1[
-        set shape "trap"
-        set color red
-        set trap-age 1
+  ask patches [
+   grow-grass
+   if trap = 1 [
+     if trap-age > max-trap-age [
+        set trap 0
+        ask traps-here [die]
       ]
-    ]
+     set trap-age trap-age + 1
+   ]
   ]
-end
 
-to check-trap
-  if any? traps-here [
-    ask traps-on patch-here [die]
-  hatch-dead-elephants 1[
-    set shape "dead-elephant"
-    set color red
-    set size 3
-    set age 1
-  ]
-   cgp:clear-cgp
-   die
-  ]
+  if count elephants = 0 [ stop ]
+  tick
 end
 
 to kill-elephant
@@ -237,11 +157,38 @@ to kill-elephant
   ]
 end
 
-to check-for-dead-elephant
-  if any? dead-elephants-on patch-here
+to place-trap
+  if economy > 2000
   [
-    ask dead-elephants-on patch-here [die]
-   set economy economy + (price-of-ivory - cost-to-lay-trap)
+    if random 100 < prob-set-trap and trap = 0 [
+;      print "Set trap"
+      set trap 1
+      set trap-age 1
+      set cooldown trap-cooldown
+      set economy economy - 2000
+      hatch-traps 1[
+        set shape "trap"
+        set color red
+      ]
+    ]
+  ]
+end
+
+to check-trap
+  if trap = 1 [
+;   show "trap here"
+   ask traps-on patch-here [die]
+   set trap 0
+   cgp:clear-cgp
+;   show "dying"
+;   show who
+  hatch-dead-elephants 1[
+    set shape "dead-elephant"
+    set color red
+    set size 3
+    set age 1
+  ]
+   die
   ]
 end
 
@@ -282,15 +229,27 @@ to-report get-in-cone [dist angle]
   [
     set obs lput (7 - ((distance pag) / 2)) obs
   ]
-  let pab min-one-of patches in-cone (dist) (angle) with [pcolor = brown] [distance myself]
-  if-else pab = nobody [
+  let poach min-one-of cone with [is-poacher? self] [distance myself]
+  if-else poach = nobody [
     set obs lput 0 obs
   ]
   [
-    set obs lput (7 - ((distance pab) / 2)) obs
+    set obs lput (7 - ((distance poach) / 2)) obs
+  ]
+  let ytrap min-one-of patches in-cone (dist) (angle) with [trap = 1] [distance myself]
+  if-else ytrap = nobody [
+    set obs lput 0 obs
+  ]
+  [
+    set obs lput (7 - ((distance ytrap) / 2)) obs
   ]
   report obs
 end
+
+;; poacher will need to observer
+;;;; elephant
+;;;; dead elephant
+;;;; self?
 
 to grow-grass
   if pcolor = brown [
@@ -317,20 +276,245 @@ to reproduce
   ]
 end
 
+to check-for-dead-elephant
+  if any? dead-elephants-on patch-here
+  [
+    ask dead-elephants-on patch-here [die]
+   set economy economy + cost-to-lay-trap
+  ]
+end
+
 
 to check-death
-;  if age > max-age [cgp:clear-cgp die]
   if energy < 0 [cgp:clear-cgp die]
 end
+
+to check-bankrupt
+  if economy < 0 [cgp:clear-cgp die]
+end
+
+
+;
+;
+
+
+;to setup
+;  clear-all
+;  reset-ticks
+;
+;  create-elephants num-elephants [
+;    setxy random-xcor random-ycor
+;    set color gray + 2
+;    set shape "elephant"
+;    set size 4.5
+;    set energy 100
+;    cgp:add-cgps 9 3 10 12 24 ;; inputs outputs lvls rows cols
+;    set age 1
+;  ]
+;
+;;   create-poachers num-poachers [
+;;    setxy random-xcor random-ycor
+;;    set shape "poacher"
+;;    set color black
+;;    set size 3.0
+;;    set economy 0
+;;    cgp:add-cgps 21 3 2 4 4
+;;    set heading 0
+;;  ]
+;;
+;;  repeat num-rangers [
+;;    ask one-of patches with [not any? rangers-here] [sprout-rangers 1 [
+;;      set shape "ranger"
+;;      set color blue
+;;      set size 3.0
+;;      set heading 0
+;;      ]
+;;    ]
+;;  ]
+;  ask patches [
+;      set pcolor one-of [ green brown ]
+;      ifelse pcolor = green
+;      [
+;        set countdown (grass-regrowth-time * 5)
+;      ]
+;      [
+;        set countdown random (grass-regrowth-time * 5)
+;      ]
+;  ]
+;end
+;
+;to go
+;  ask elephants [
+;    let obs get-observations
+;    let action-vector cgp:get-action obs
+;;    show action-vector
+;
+;    ifelse action-vector = (list 0 0 0)
+;    [
+;      let action one-of [1 2 3]
+;      if action = 1 [
+;        fd 0.5
+;        set energy energy - 1
+;      ]
+;      if action = 2 [
+;        lt 20
+;        set energy energy - 0.5
+;      ]
+;      if action = 3 [
+;        rt 20
+;        set energy energy - 0.5
+;      ]
+;    ]
+;    [
+;      ;; get cumulative sums
+;      let cum-sum (list)
+;      set cum-sum lput (item 0 action-vector) cum-sum
+;      set cum-sum lput (item 0 action-vector + item 1 action-vector) cum-sum
+;      set cum-sum lput (item 1 cum-sum + item 2 action-vector) cum-sum
+;
+;;      show action-vector
+;
+;      let n random-float sum action-vector
+;
+;      (ifelse n < (item 0 cum-sum) [
+;        ;; do first action
+;        fd 0.2
+;        set energy energy - 1
+;      ]
+;      n < (item 1 cum-sum) [
+;        ;; do second action
+;        lt 20
+;        set energy energy - 0.5
+;      ]
+;      n <= (item 2 cum-sum) [
+;        ;; do third action
+;        rt 20
+;        set energy energy - 0.5
+;      ]
+;      [
+;        ;; else should never come here
+;          print "Should not be here"
+;      ])
+;    ]
+;    eat
+;    reproduce
+;    check-trap
+;    check-death
+;    set age age + 1
+;  ]
+;  ;;;;;;;;;;;;;;;;;;;;;;;;;
+;  ;;;;;;; POACHERS SECTION
+;  ;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+;  ; elephant kill is gain of 10700 USD
+;  ; trap cost is 2000 USD
+;;  ask poachers [
+;;    let obs get-observations
+;;    let action-vector cgp:get-action obs
+;;        ifelse action-vector = (list 0 0 0)
+;;    [
+;;      let action one-of [1 2 3]
+;;      if action = 1 [fd 0.2]
+;;      if action = 2 [lt 20]
+;;      if action = 3 [rt 20]
+;;;      if action = 4 [place-trap]
+;;    ]
+;;    [
+;;      ;; get cumulative sums
+;;      let cum-sum (list)
+;;      set cum-sum lput (item 0 action-vector) cum-sum
+;;      set cum-sum lput (item 0 action-vector + item 1 action-vector) cum-sum
+;;      set cum-sum lput (item 1 cum-sum + item 2 action-vector) cum-sum
+;;;      set cum-sum lput (item 1 cum-sum + item 2 action-vector + item 3 action-vector) cum-sum
+;;
+;;      let n random-float sum action-vector
+;;
+;;
+;;      (ifelse n < (item 0 cum-sum) [
+;;        ;; do first action
+;;        fd 0.2
+;;      ]
+;;      n < (item 1 cum-sum) [
+;;        ;; do second action
+;;        lt 20
+;;      ]
+;;      n < (item 2 cum-sum) [
+;;        ;; do third action
+;;        rt 20
+;;      ]
+;;      [
+;;        ;; else should never come here
+;;          print "Should not be here"
+;;      ])
+;;    ]
+;;    kill-elephant
+;;    ifelse cooldown = 0  [
+;;      place-trap
+;;    ]
+;;    [
+;;     set cooldown cooldown - 1
+;;    ]
+;;    check-bankrupt
+;;  ]
+;
+;  ask patches [
+;   grow-grass
+;  ]
+;
+;;  if ticks mod num-generation = 0 [
+;;     new-gen
+;;   ]
+;  if count elephants = 0 [ stop ]
+;  tick
+;end
+;
+
+;
+
+;
+;
+
+;
+
+;
+;;to new-gen
+;;  new-gen-poachers
+;;  new-gen-rangers
+;;end
+;;
+;;to new-gen-rangers
+;;
+;;end
+;
+;;to new-gen-poachers
+;;  set generation generation + 1
+;;  let best-poacher one-of (poachers with-max [economy])
+;;  if best-poacher != nobody [
+;;    ask poachers with [who != [who] of best-poacher] [die ]
+;;    repeat num-poachers [
+;;      create-poachers 1 [
+;;        setxy ([xcor] of best-poacher) ([ycor] of best-poacher)
+;;        set shape "poacher"
+;;        set color black
+;;        set size 3.0
+;;        cgp:mutate-reproduce best-poacher mutation-diff-percent
+;;        set economy 0
+;;        setxy random-xcor random-ycor
+;;        set cooldown trap-cooldown
+;;      ]
+;;    ]
+;;    ask best-poacher [die]
+;;  ]
+;;end
 @#$#@#$#@
 GRAPHICS-WINDOW
-661
-15
-1191
-546
+636
+18
+1132
+515
 -1
 -1
-15.82
+14.8
 1
 10
 1
@@ -351,10 +535,10 @@ ticks
 30.0
 
 BUTTON
-302
-291
-370
-324
+119
+319
+187
+352
 NIL
 go
 T
@@ -368,10 +552,10 @@ NIL
 1
 
 BUTTON
-208
-290
-274
-323
+25
+314
+91
+347
 NIL
 setup
 NIL
@@ -400,28 +584,43 @@ NIL
 HORIZONTAL
 
 SLIDER
-17
-56
-197
-89
+228
+13
+400
+46
+num-poachers
+num-poachers
+0
+100
+3.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+0
+53
+218
+86
 elephant-gain-from-food
 elephant-gain-from-food
 0
 100
-6.0
+10.0
 1
 1
 NIL
 HORIZONTAL
 
 PLOT
-12
-339
-333
-548
+11
+365
+263
+553
 Populations
-Ticks
-Number of Elephants
+NIL
+NIL
 0.0
 10.0
 0.0
@@ -430,13 +629,14 @@ true
 true
 "" ""
 PENS
-"elephants" 1.0 0 -16777216 true "" "plot count elephants"
+"elephants" 1.0 0 -3026479 true "" "plot count elephants"
+"poachers" 1.0 0 -16449023 true "" "plot count poachers"
 
 SLIDER
-17
-96
-199
-129
+21
+90
+206
+123
 grass-regrowth-time
 grass-regrowth-time
 100
@@ -448,21 +648,51 @@ NIL
 HORIZONTAL
 
 MONITOR
-90
-183
-169
-228
+94
+235
+182
+280
 max-energy
 max [energy] of elephants
-4
+17
 1
 11
 
+SLIDER
+227
+54
+399
+87
+prob-set-trap
+prob-set-trap
+0
+100
+5.0
+5
+1
+NIL
+HORIZONTAL
+
+SLIDER
+226
+93
+398
+126
+trap-cooldown
+trap-cooldown
+20
+500
+80.0
+20
+1
+NIL
+HORIZONTAL
+
 MONITOR
-26
-183
-76
-228
+22
+236
+79
+281
 Age
 max [age] of elephants
 17
@@ -470,105 +700,111 @@ max [age] of elephants
 11
 
 SLIDER
-19
-138
-199
-171
+16
+131
+210
+164
 mutation-diff-percent
 mutation-diff-percent
 0
 0.2
-0.04
+0.05
 0.01
 1
 NIL
 HORIZONTAL
 
-PLOT
-349
-339
-647
-547
-Grass Presence per 1000 ticks
-Ticks
-Grass Amount
-0.0
-10.0
-0.0
-10.0
-true
-false
-"" ""
-PENS
-"grass-consumed" 0.0 0 -16777216 true "" "if ticks mod 1000 = 0 [\nplotxy ticks (grass-consumed / 1000)\nset grass-consumed 0\n]"
-
-SLIDER
+MONITOR
 223
-15
-395
-48
-num-poachers
-num-poachers
+234
+305
+279
+Max Economy
+max [economy] of poachers
+17
 1
+11
+
+SLIDER
+226
+134
+398
+167
+max-trap-age
+max-trap-age
 50
-4.0
-1
-1
-NIL
-HORIZONTAL
-
-BUTTON
-383
-291
-495
-324
-NIL
-start-poaching
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-SLIDER
-414
-136
-597
-169
-time-to-decompose-carcass
-time-to-decompose-carcass
-250
-1000
-400.0
-25
+500
+205.0
+5
 1
 NIL
 HORIZONTAL
 
 SLIDER
-216
-96
-388
-129
-max-trap-age
-max-trap-age
-0
+412
+13
+584
+46
+price-of-ivory
+price-of-ivory
+2000
+10000
+10000.0
+500
+1
+NIL
+HORIZONTAL
+
+SLIDER
+412
+53
+595
+86
+cost-to-murder-elephant
+cost-to-murder-elephant
+2000
+10000
+8000.0
 100
-50.0
-1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-216
-180
-388
-213
+417
+93
+589
+126
+cost-to-lay-trap
+cost-to-lay-trap
+1000
+10000
+2000.0
+100
+1
+NIL
+HORIZONTAL
+
+SLIDER
+409
+133
+612
+166
+time-to-decompose-carcass
+time-to-decompose-carcass
+50
+1000
+250.0
+20
+1
+NIL
+HORIZONTAL
+
+SLIDER
+227
+175
+399
+208
 retirement-age
 retirement-age
 18
@@ -579,89 +815,25 @@ retirement-age
 NIL
 HORIZONTAL
 
-SLIDER
-221
-58
-393
-91
-prob-set-trap
-prob-set-trap
-0
-100
-5.0
+MONITOR
+313
+234
+400
+279
+Mean Economy
+mean [economy] of poachers
+4
 1
-1
-NIL
-HORIZONTAL
-
-SLIDER
-216
-136
-388
-169
-trap-cooldown
-trap-cooldown
-0
-500
-80.0
-1
-1
-NIL
-HORIZONTAL
-
-SLIDER
-420
-14
-592
-47
-price-of-ivory
-price-of-ivory
-0
-400000
-350000.0
-1000
-1
-NIL
-HORIZONTAL
-
-SLIDER
-421
-56
-591
-89
-cost-to-murder-elephant
-cost-to-murder-elephant
-0
-10000
-5000.0
-100
-1
-NIL
-HORIZONTAL
-
-SLIDER
-420
-96
-592
-129
-cost-to-lay-trap
-cost-to-lay-trap
-0
-10000
-2000.0
-100
-1
-NIL
-HORIZONTAL
+11
 
 PLOT
-1199
-252
-1547
-543
-Poacher Mean Economy Upon Retirement
+280
+363
+574
+556
+Grass Presence Per 1000 Ticks
 Ticks
-Economy
+Grass Amount
 0.0
 10.0
 0.0
@@ -670,62 +842,7 @@ true
 false
 "" ""
 PENS
-"Poacher Econ" 1.0 0 -16777216 true "" "if ticks mod 80 = 0 [\nifelse total-retired = 0 [plotxy ticks 0]\n[\n  plotxy ticks (total-econ-retirement / total-retired)\n]\n]\n"
-
-MONITOR
-145
-235
-256
-280
-Mean Econ Poachers
-mean [economy] of poachers
-4
-1
-11
-
-MONITOR
-6
-235
-134
-280
-Max Econ Curr Poachers
-max [economy] of poachers
-4
-1
-11
-
-MONITOR
-264
-235
-388
-280
-NIL
-ticks-since-poaching
-17
-1
-11
-
-MONITOR
-396
-236
-526
-281
-Mean Retirement Econ
-total-econ-retirement / total-retired
-4
-1
-11
-
-MONITOR
-534
-236
-629
-281
-Max Econ Ever
-max-economy-recorded
-4
-1
-11
+"grass presence" 1.0 0 -16777216 true "" "if ticks mod 1000 = 0 [\nplotxy ticks (grass-consumed / 1000)\nset grass-consumed 0\n]"
 
 @#$#@#$#@
 ## WHAT IS IT?
@@ -1060,15 +1177,15 @@ Circle -7500403 true true 120 120 60
 trap
 true
 1
-Polygon -2674135 true true 90 120 105 75 120 120 90 120
-Polygon -2674135 true true 135 120 150 75 165 120 135 120
-Polygon -2674135 true true 180 120 195 75 210 120 180 120
-Polygon -2674135 true true 90 180 105 135 120 180 90 180
-Polygon -2674135 true true 135 180 150 135 165 180 135 180
-Polygon -2674135 true true 180 180 195 135 210 180 180 180
-Polygon -2674135 true true 90 240 105 195 120 240 90 240
-Polygon -2674135 true true 135 240 150 195 165 240 135 240
-Polygon -2674135 true true 180 240 195 195 210 240 180 240
+Polygon -955883 true false 90 120 105 75 120 120 90 120
+Polygon -955883 true false 135 120 150 75 165 120 135 120
+Polygon -955883 true false 180 120 195 75 210 120 180 120
+Polygon -955883 true false 90 180 105 135 120 180 90 180
+Polygon -955883 true false 135 180 150 135 165 180 135 180
+Polygon -955883 true false 180 180 195 135 210 180 180 180
+Polygon -955883 true false 90 240 105 195 120 240 90 240
+Polygon -955883 true false 135 240 150 195 165 240 135 240
+Polygon -955883 true false 180 240 195 195 210 240 180 240
 
 tree
 false
@@ -1146,36 +1263,6 @@ NetLogo 6.2.0
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
-<experiments>
-  <experiment name="measure-grass-consumption" repetitions="1" runMetricsEveryStep="true">
-    <setup>setup
-let grass-consumed 0</setup>
-    <go>go</go>
-    <metric>set grass-consumed (grass-consumed + count patches with [pcolor = green])</metric>
-    <metric>if tick mod 1000 = 0 [</metric>
-    <metric>report (grass-consumed / 1000)</metric>
-    <metric>set grass-consumed 0</metric>
-    <metric>]</metric>
-    <enumeratedValueSet variable="mutation-diff-percent">
-      <value value="0.04"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="num-elephants">
-      <value value="50"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="elephant-gain-from-food">
-      <value value="6"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="max-age">
-      <value value="450"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="grass-regrowth-time">
-      <value value="280"/>
-    </enumeratedValueSet>
-    <enumeratedValueSet variable="busses-reproduce">
-      <value value="2"/>
-    </enumeratedValueSet>
-  </experiment>
-</experiments>
 @#$#@#$#@
 @#$#@#$#@
 default

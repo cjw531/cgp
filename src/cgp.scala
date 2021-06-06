@@ -13,7 +13,7 @@ import scala.util.Random
 class cgp extends api.DefaultClassManager {
 
     class Functions() {
-      val total_funcs = 5
+      val total_funcs = 7
 
       def add (x: Double, y: Double): Double = {
         x + y
@@ -33,23 +33,23 @@ class cgp extends api.DefaultClassManager {
       def constant(x: Double, y:Double): Double = {
         return 1.0
       }
-//      def both_positive(x: Double, y: Double): Double = {
-//        if (x > 0 && y > 0) {
-//          return 1.0
-//        }
-//        else {
-//          return 0.0
-//        }
-//      }
+      def both_positive(x: Double, y: Double): Double = {
+        if (x > 0 && y > 0) {
+          return 1.0
+        }
+        else {
+          return 0.0
+        }
+      }
 
-//      def greater_than(x: Double, y:Double): Double = {
-//        if (x >= y) {
-//          return 1.0
-//        }
-//        else {
-//          return 0.0
-//        }
-//      }
+      def greater_than(x: Double, y:Double): Double = {
+        if (x >= y) {
+          return 1.0
+        }
+        else {
+          return 0.0
+        }
+      }
     }
 
     class Node(number_i: Int, func_idx_i: Int, incoming1: Int, incoming2: Int) {
@@ -114,7 +114,7 @@ class cgp extends api.DefaultClassManager {
         this.node_list += new_node
         if (row_counter % this.num_rows == 0) {
           last_node_number_in_column = i
-//          println(last_node_number_in_column)
+          println(last_node_number_in_column)
           row_counter = 0
         }
         row_counter += 1
@@ -209,15 +209,15 @@ class cgp extends api.DefaultClassManager {
           else if (function_to_apply == 3) {
             computed_val = funcs.divide(NodeOutput(this.node_list(active_node_idx).Incoming1), NodeOutput(this.node_list(active_node_idx).Incoming2))
           }
-          else {
+          else if (function_to_apply == 4) {
             computed_val = funcs.constant(NodeOutput(this.node_list(active_node_idx).Incoming1), NodeOutput(this.node_list(active_node_idx).Incoming2))
           }
-//          else if (function_to_apply == 5) {
-//            computed_val = funcs.both_positive(NodeOutput(this.node_list(active_node_idx).Incoming1), NodeOutput(this.node_list(active_node_idx).Incoming2))
-//          }
-//          else {
-//            computed_val = funcs.greater_than(NodeOutput(this.node_list(active_node_idx).Incoming1), NodeOutput(this.node_list(active_node_idx).Incoming2))
-//          }
+          else if (function_to_apply == 5) {
+            computed_val = funcs.both_positive(NodeOutput(this.node_list(active_node_idx).Incoming1), NodeOutput(this.node_list(active_node_idx).Incoming2))
+          }
+          else {
+            computed_val = funcs.greater_than(NodeOutput(this.node_list(active_node_idx).Incoming1), NodeOutput(this.node_list(active_node_idx).Incoming2))
+          }
           NodeOutput(active_node_idx + this.num_inputs) = computed_val
         }
       }
@@ -232,10 +232,10 @@ class cgp extends api.DefaultClassManager {
   /////////////////////////
   ///// mutates CGP ///////
   /////////////////////////
-  def mutate_cgp(parent_cgp: Cgp, mutation_rate: Double, num_ticks_to_stop_forced_mutation: Int, num_iterations: Int): Cgp = {
+  def mutate_cgp(parent_cgp: Cgp, mutation_rate: Double): Cgp = {
     // deep copy CGP
-//    print("Num Outputs: ")
-//    println(parent_cgp.num_outputs)
+    print("Num Outputs: ")
+    println(parent_cgp.num_outputs)
     var mutated_cgp = new Cgp(parent_cgp.num_inputs, parent_cgp.num_outputs, parent_cgp.lvls_back, parent_cgp.num_rows, parent_cgp.num_cols)
     var node_list_copied = ListBuffer[Node]()
     for (node <- parent_cgp.node_list) {
@@ -251,17 +251,14 @@ class cgp extends api.DefaultClassManager {
 
     // remake nodes by certain probability
     var flag_changed = false
-//    while (flag_changed == false) {
-//      if (num_iterations >= num_ticks_to_stop_forced_mutation) {
-//        flag_changed = true
-//      }
+    while (flag_changed == false) {
       var last_node_number_in_column = mutated_cgp.num_inputs - 1
       var row_counter = 1
       for (node_idx <- 0 to (mutated_cgp.node_list.length - 1) + mutated_cgp.num_outputs) {
         //        println(node_idx)
         if (node_idx > mutated_cgp.node_list.length - 1) {
           var output_idx = node_idx - mutated_cgp.node_list.length
-          val prob = r.nextDouble * 10
+          val prob = r.nextDouble * 100
           if (prob <= mutation_rate) {
             flag_changed = true
             mutated_cgp.set_output_connection(r.nextInt(mutated_cgp.num_inputs + (mutated_cgp.num_rows*mutated_cgp.num_cols) - 1), output_idx)
@@ -269,7 +266,7 @@ class cgp extends api.DefaultClassManager {
         }
         else {
           var node = mutated_cgp.node_list(node_idx)
-          val prob = r.nextDouble * 10
+          val prob = r.nextDouble * 100
           if (prob <= mutation_rate) {
             flag_changed = true // mark that a change was made
             // alter an entire node (alter incoming edges and function)
@@ -286,7 +283,7 @@ class cgp extends api.DefaultClassManager {
         }
         row_counter += 1
       }
-//    }
+    }
 
     // compute active nodes
     mutated_cgp.find_active_nodes()
@@ -330,13 +327,11 @@ class cgp extends api.DefaultClassManager {
 
   object mutate_reproduce extends api.Command {
     override def getSyntax: Syntax =
-          Syntax.commandSyntax(right = List(Syntax.AgentType, Syntax.NumberType, Syntax.NumberType, Syntax.NumberType), agentClassString = "-T--")
+          Syntax.commandSyntax(right = List(Syntax.AgentType, Syntax.NumberType), agentClassString = "-T--")
     override def perform(args: Array[Argument], context: Context): Unit = {
       var CGP_to_mutate = turtlesToCgps(args(0).getAgent.asInstanceOf[api.Turtle])
       var mutation_rate = args(1).getDoubleValue
-      var max_ticks = args(2).getIntValue
-      var curr_ticks = args(3).getIntValue
-      var offspring_cgp = mutate_cgp(CGP_to_mutate, mutation_rate, max_ticks, curr_ticks)
+      var offspring_cgp = mutate_cgp(CGP_to_mutate, mutation_rate)
       context.getAgent match {
         case turtle: api.Turtle => turtlesToCgps.update(turtle, offspring_cgp)
       }
