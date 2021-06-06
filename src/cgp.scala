@@ -12,6 +12,9 @@ import scala.util.Random
 
 class cgp extends api.DefaultClassManager {
 
+  /*
+  Defines possible functions for operators to contain
+   */
     class Functions() {
       val total_funcs = 7
 
@@ -52,6 +55,9 @@ class cgp extends api.DefaultClassManager {
       }
     }
 
+  /*
+  Defines node class which define network
+   */
     class Node(number_i: Int, func_idx_i: Int, incoming1: Int, incoming2: Int) {
       val number = number_i
       var func_idx = func_idx_i
@@ -72,6 +78,9 @@ class cgp extends api.DefaultClassManager {
 
     }
 
+  /*
+  Defines CGP object that holds entire network
+   */
   class Cgp(num_inputs_i: Int, num_outputs_i: Int, lvls_back_i: Int, num_rows_i: Int, num_cols_i: Int) {
     val arity = 2
     val num_inputs = num_inputs_i
@@ -95,13 +104,14 @@ class cgp extends api.DefaultClassManager {
       OutputConnections += node_num_to_add
     }
 
-    /////////////////////////
-    ///// Creates CGP ///////
-    /////////////////////////
+    /*
+    Creates random CGP
+     */
     def create_cgp(): Unit = {
       // make graph
       /////// create nodes with linkage back to any of the nodes
       var last_node_number_in_column = this.num_inputs - 1
+      // Creates new inner node and choose a random incoming edge on it which can be any node in a column before it
       var row_counter = 1
       for (i <- this.num_inputs to (this.num_inputs + (this.num_rows * this.num_cols) - 1)) {
         var incoming1 = 0
@@ -110,11 +120,11 @@ class cgp extends api.DefaultClassManager {
           incoming1 = r.nextInt(last_node_number_in_column) // pick random node before it
           incoming2 = r.nextInt(last_node_number_in_column)
         }
-        var new_node = new Node(i, r.nextInt(funcs.total_funcs), incoming1, incoming2)
-        this.node_list += new_node
+        var new_node = new Node(i, r.nextInt(funcs.total_funcs), incoming1, incoming2) // create new node
+        this.node_list += new_node // add to node list
+        // Set last node in column
         if (row_counter % this.num_rows == 0) {
           last_node_number_in_column = i
-          println(last_node_number_in_column)
           row_counter = 0
         }
         row_counter += 1
@@ -125,11 +135,9 @@ class cgp extends api.DefaultClassManager {
       }
     }
 
-    //
-
-    /////////////////////////
-    ///// Finds Active Nodes ///////
-    /////////////////////////
+    /*
+    Generate a boolean array of all the nodes that are active in the network
+     */
     def find_active_nodes(): Unit = {
 
       // Instantiate active nodes array with all false to start with
@@ -168,9 +176,9 @@ class cgp extends api.DefaultClassManager {
       find_active_nodes_helper(this.node_list(node_number - this.num_inputs).Incoming2)
     } // end of recursive helper function
 
-    /////////////////////////
-    ///// Solves CGP ///////
-    /////////////////////////
+    /*
+    Solve the network to get output values
+     */
     def decode_cgp(input_values: List[Double]): List[Double] = {
       // if all active nodes are false, then just return the input value
       if (!this.ActiveNodes.contains(true)) {
@@ -197,6 +205,7 @@ class cgp extends api.DefaultClassManager {
           // If active node is true, then compute the function at the node with its incoming edges
           var function_to_apply = this.node_list(active_node_idx).func_idx
           var computed_val = 0.0
+          // apply functions to incoming edges at nodes
           if (function_to_apply == 0) {
             computed_val = funcs.add(NodeOutput(this.node_list(active_node_idx).Incoming1), NodeOutput(this.node_list(active_node_idx).Incoming2))
           }
@@ -218,9 +227,11 @@ class cgp extends api.DefaultClassManager {
           else {
             computed_val = funcs.greater_than(NodeOutput(this.node_list(active_node_idx).Incoming1), NodeOutput(this.node_list(active_node_idx).Incoming2))
           }
+          // set value in array to use in later iteration
           NodeOutput(active_node_idx + this.num_inputs) = computed_val
         }
       }
+      // Get output values by extracting output from its incoming edge
       var result = ListBuffer[Double]()
       for (output_node <- this.OutputConnections) {
         result += NodeOutput(output_node)
@@ -229,13 +240,11 @@ class cgp extends api.DefaultClassManager {
     }
   } // end of CGP class
 
-  /////////////////////////
-  ///// mutates CGP ///////
-  /////////////////////////
+  /*
+  Mutate CGP by re-making nodes by a probability
+   */
   def mutate_cgp(parent_cgp: Cgp, mutation_rate: Double): Cgp = {
     // deep copy CGP
-    print("Num Outputs: ")
-    println(parent_cgp.num_outputs)
     var mutated_cgp = new Cgp(parent_cgp.num_inputs, parent_cgp.num_outputs, parent_cgp.lvls_back, parent_cgp.num_rows, parent_cgp.num_cols)
     var node_list_copied = ListBuffer[Node]()
     for (node <- parent_cgp.node_list) {
@@ -290,13 +299,10 @@ class cgp extends api.DefaultClassManager {
     return mutated_cgp
   }
 
-    def func_to_eval(point: Double): Double = {
-      (point * point * point) + point
-    }
-
   /*******************************************************************************
   **************************NETLOGO PORTION***************************************
    *******************************************************************************/
+    // define initial map to contain turtle -> Cgp relationship
   var turtlesToCgps: mutable.Map[api.Turtle, Cgp] = mutable.LinkedHashMap[api.Turtle, Cgp]()
 
   /* Load primitives for NetLogo */
@@ -307,30 +313,40 @@ class cgp extends api.DefaultClassManager {
     manager.addPrimitive(name = "clear-cgp", clearCgp)
   }
 
+  /*
+  Adds CGP to agent
+   */
   object addCgp extends api.Command {
     override def getSyntax: Syntax = Syntax.commandSyntax(right = List(Syntax.NumberType, Syntax.NumberType, Syntax.NumberType, Syntax.NumberType, Syntax.NumberType), agentClassString = "-T--")
 
     override def perform(args: Array[Argument], context: Context): Unit = {
+      // get inputs
       var numb_inps = args(0).getIntValue
       var numb_outs = args(1).getIntValue
       var numb_lvls = args(2).getIntValue
       var numb_rows = args(3).getIntValue
       var numb_cols = args(4).getIntValue
+      // create cgp instance
       var net = new Cgp(numb_inps, numb_outs, numb_lvls, numb_rows, numb_cols)
-      net.create_cgp()
-      net.find_active_nodes()
+      net.create_cgp() // creates random network
+      net.find_active_nodes() // finds a boolean array of all the active nodes
       context.getAgent match {
         case turtle: api.Turtle => turtlesToCgps.update(turtle, net)
       }
     }
   }
 
+  /*
+  Mutates the CGP from the parent when creating an offspring
+   */
   object mutate_reproduce extends api.Command {
     override def getSyntax: Syntax =
           Syntax.commandSyntax(right = List(Syntax.AgentType, Syntax.NumberType), agentClassString = "-T--")
     override def perform(args: Array[Argument], context: Context): Unit = {
+      // get inputs
       var CGP_to_mutate = turtlesToCgps(args(0).getAgent.asInstanceOf[api.Turtle])
       var mutation_rate = args(1).getDoubleValue
+      // mutate the parent CGP
       var offspring_cgp = mutate_cgp(CGP_to_mutate, mutation_rate)
       context.getAgent match {
         case turtle: api.Turtle => turtlesToCgps.update(turtle, offspring_cgp)
@@ -338,18 +354,25 @@ class cgp extends api.DefaultClassManager {
     }
   }
 
+  /*
+  Decodes the network to get the action vector
+   */
   object getAction extends api.Reporter {
     override def getSyntax =
       Syntax.reporterSyntax(right = List(Syntax.ListType), ret = Syntax.ListType, agentClassString = "-T--")
 
     def report(args: Array[Argument], context: Context): AnyRef = {
+      // get inputs
       var input_points_nlogo = args(0).getList.toList.map(_.toString.toDouble)
+      // solve the network based on the active nodes
       var action_probs = turtlesToCgps(context.getAgent.asInstanceOf[api.Turtle]).decode_cgp(input_points_nlogo)
       return action_probs.toLogoList
-//      return action_probs.asInstanceOf[AnyRef]
     }
   }
 
+  /*
+  Removes CGP from hashmap to clear memory
+   */
   object clearCgp extends api.Command {
     override def getSyntax =
       Syntax.commandSyntax(right = List(), agentClassString = "-T--")
