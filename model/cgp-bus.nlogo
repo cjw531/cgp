@@ -32,7 +32,7 @@ to setup
   ]
 
   create-bad-cheese initial-num-bad-cheese [
-    set shape "cheese"
+    set shape "bad-cheese"
     setxy random-xcor random-ycor
     set size 2
     set age 1
@@ -311,12 +311,12 @@ NIL
 1
 
 MONITOR
-276
-196
-330
-241
-busses
-count busses
+299
+117
+372
+162
+Num Mice
+count mice
 17
 1
 11
@@ -337,15 +337,15 @@ true
 true
 "" ""
 PENS
-"busses" 1.0 0 -16777216 true "" "plot count busses"
+"Mice" 1.0 0 -16777216 true "" "plot count mice"
 
 MONITOR
-352
-195
-431
-240
+375
+116
+454
+161
 max energy
-max [energy] of busses
+max [energy] of mice
 17
 1
 11
@@ -389,22 +389,11 @@ initial-num-bad-cheese
 initial-num-bad-cheese
 0
 100
-10.0
+72.0
 1
 1
 NIL
 HORIZONTAL
-
-MONITOR
-304
-257
-405
-318
-generation
-generation
-17
-1
-15
 
 SLIDER
 33
