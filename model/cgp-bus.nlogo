@@ -62,7 +62,7 @@ to go
     ifelse action-vector = (list 0 0 0)
     [
       fd 0.2
-      set energy energy - 0.2
+      set energy energy - 0.1
     ]
     [
       ;; get cumulative sums
@@ -77,7 +77,7 @@ to go
       (ifelse n < (item 0 cum-sum) [
         ;; move forward
         fd 0.2
-        set energy energy - 0.2
+        set energy energy - 0.1
       ]
       n < (item 1 cum-sum) [
         ;; turn left
@@ -389,7 +389,7 @@ initial-num-bad-cheese
 initial-num-bad-cheese
 0
 100
-72.0
+8.0
 1
 1
 NIL
