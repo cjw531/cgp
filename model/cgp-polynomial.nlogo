@@ -1,39 +1,294 @@
 extensions [cgp]
 
-to generate-point
-  let points cgp:rand-point num-point
-  show points
+globals [generation]
+
+turtles-own [energy poisoned]
+cheese-own [age]
+bad-cheese-own [age]
+
+breed [busses bus]
+breed [cheese a-cheese]
+breed [bad-cheese a-bad-cheese]
+
+
+to setup
+  clear-all
+  reset-ticks
+
+  create-busses initial-num-mice [
+    setxy random-xcor random-ycor
+    set color gray
+    set shape "my-mouse"
+    set size 2
+    set energy 100
+    cgp:add-cgps 9 3 2 5 5
+  ]
+
+  repeat initial-num-cheese [
+    ask one-of patches with [not any? cheese-here] [sprout-cheese 1 [
+      set shape "person"
+      set color orange
+      set size 1.5
+      set age 1
+      ]
+    ]
+  ]
+
+  repeat initial-num-bad-cheese [
+    ask one-of patches with [not any? bad-cheese-here] [sprout-bad-cheese 1 [
+      set shape "person"
+      set color blue
+      set size 1.5
+      set age 1
+      ]
+    ]
+  ]
+
+  ask patches [
+   set pcolor black
+  ]
 end
 
-to true-value
-  let values cgp:true-value
-  show values
-end
-
-to generate-cgp
-  let first-result cgp:init_cgp
-  show word "Best CGP #: " item 0 first-result
-  show word "Best evaluation score: " item 1 first-result
-end
 
 to go
-  let iter 0
-  let eval-score 0
-  while [iter < num-generation and eval-score > 100] [
-    set iter iter + 1
-    set eval-score cgp:mutate_breed mutation-rate
-    show word "Score: " eval-score
+  ask busses [
+    let obs get-observations
+    let action-vector cgp:get-action obs
+;    show action-vector ;; raw probabilities
+
+
+    ifelse action-vector = (list 0 0 0)
+    [
+      let action one-of [1 2 3]
+      if action = 1 [fd 1]
+      if action = 2 [lt 20]
+      if action = 3 [rt 20]
+    ]
+    [
+      ;; get cumulative sums
+      let cum-sum (list)
+      set cum-sum lput (item 0 action-vector) cum-sum
+      set cum-sum lput (item 0 action-vector + item 1 action-vector) cum-sum
+      set cum-sum lput (item 1 cum-sum + item 2 action-vector) cum-sum
+
+      let n random-float sum action-vector
+
+
+      (ifelse n < (item 0 cum-sum) [
+        ;; do first action
+        ifelse color = red [
+          fd 0.1
+          set energy energy - 5
+        ]
+        [
+          fd 0.2
+          set energy energy - 1
+        ]
+      ]
+      n < (item 1 cum-sum) [
+        ;; do second action
+        ifelse color = red [
+           lt 10
+           set energy energy - 2.5
+        ]
+        [
+           lt 20
+           set energy energy - 0.5
+        ]
+      ]
+      n < (item 2 cum-sum) [
+        ;; do third action
+        ifelse color = red [
+          rt 10
+          set energy energy - 2.5
+        ]
+        [
+          rt 20
+          set energy energy - 0.5
+        ]
+      ]
+      [
+        ;; else should never come here
+          print "Should not be here"
+      ])
+    ]
+    handle-poison
+    eat
+;    check-death
+    reproduce
+;    set energy energy - 1
+  ]
+
+  ask cheese [
+    set age age + 1
+    people-death
+  ]
+
+  ask bad-cheese [
+    set age age + 1
+    people-death
+  ]
+
+  create-new-people
+
+  if not any? busses [ stop ]
+
+  tick
+end
+
+
+to handle-poison
+  if color = red [
+   ifelse poisoned > 200 [
+     set poisoned 1
+     set color gray
+    ]
+   [
+     set poisoned poisoned + 1
+    ]
+  ]
+end
+
+to eat
+  let food one-of cheese-here
+  if food != nobody [
+    ask food [die]
+    ifelse color = red
+    [
+      set energy energy + 3
+      set poisoned 1
+    ]
+    [set energy energy + 10]
+  ]
+  set food one-of bad-cheese-here
+  if food != nobody [
+    ask food [die]
+    set color red
+    set energy energy - 20
+  ]
+end
+
+to draw-cone [degrees depth]
+  rt degrees / 2.0
+  pd
+  fd depth
+  lt 180 - ((180 - degrees) / 2.0)
+  fd sqrt (2 * depth ^ 2 * (1 - cos degrees))
+  lt 180 - ((180 - degrees) / 2.0)
+  fd depth
+  lt 180 - (degrees / 2.0)
+  pu
+end
+
+to draw-cones [offset depth degrees num]
+  hatch 1 [
+    hide-turtle
+    set color white
+    lt offset
+    repeat num [
+      draw-cone degrees depth
+      rt degrees
+    ]
+    lt offset + degrees
+    die
+  ]
+end
+
+to-report get-observations
+  ;; draw-cones (3 * 20 / 2 - 20 / 2) 5 20 3
+
+  let obs []
+  rt 20
+  repeat 3 [
+    set obs sentence obs (get-in-cone 7 20)
+    lt 20
+  ]
+  rt 40
+  set obs map [i -> i / 7] obs
+  report obs
+end
+
+to-report get-in-cone [dist angle]
+  let obs []
+  let cone other turtles in-cone 7 20
+  let b min-one-of cone with [is-bus? self] [distance myself]
+  if-else b = nobody [
+    set obs lput 0 obs
+  ]
+  [
+    set obs lput (7 - ((distance b) / 2)) obs
+  ]
+  let i min-one-of cone with [is-inmate? self] [distance myself]
+  if-else i = nobody [
+    set obs lput 0 obs
+  ]
+  [
+    set obs lput (7 - ((distance i) / 2)) obs
+  ]
+   let o min-one-of cone with [is-officer? self] [distance myself]
+  if-else o = nobody [
+    set obs lput 0 obs
+  ]
+  [
+    set obs lput (7 - ((distance o) / 2)) obs
+  ]
+
+  report obs
+end
+
+;; Check if person should die
+to people-death
+  if breed = cheese [
+    if age > 400 [die]
+  ]
+  if breed = bad-cheese [
+    if age > 100 [die]
+  ]
+end
+
+to create-new-people
+  if random 100 < 10 [
+    ask one-of patches with [not any? inmates-here] [sprout-inmates 1 [
+      set shape "person"
+      set color orange
+      set size 1.5
+      set age 1
+      ]
+    ]
+  ]
+  if random 100 < 5 [
+    ask one-of patches with [not any? officers-here] [sprout-officers 1 [
+      set shape "person"
+      set color blue
+      set size 1.5
+      set age 1
+      ]
+    ]
+  ]
+end
+
+to move
+  fd 1
+end
+
+to reproduce
+  if random-float 100 < busses-reproduce and energy >= 80[  ; throw "dice" to see if you will reproduce
+    set energy (energy / 2)               ; divide energy between parent and offspring
+    hatch 1 [
+      rt random-float 360 fd 1
+      cgp:mutate-reproduce myself 0.05
+    ]  ; hatch an offspring and move it forward 1 step
   ]
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-236
-10
-673
-448
+507
+70
+845
+409
 -1
 -1
-13.0
+10.0
 1
 10
 1
@@ -47,90 +302,77 @@ GRAPHICS-WINDOW
 16
 -16
 16
-0
-0
+1
+1
 1
 ticks
 30.0
 
-BUTTON
-108
-18
-223
-51
-NIL
-generate-point
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-INPUTBOX
-18
+SLIDER
+24
 16
+196
+49
+initial-num-mice
+initial-num-mice
+1
 100
-91
-num-point
-100.0
+15.0
 1
-0
-Number
+1
+NIL
+HORIZONTAL
 
-BUTTON
-108
-56
-224
-89
-NIL
-true-value
-NIL
+SLIDER
+206
+218
+378
+251
+num-points
+num-points
 1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
+1000
+501.0
+10
 1
+NIL
+HORIZONTAL
 
-BUTTON
-126
-130
-224
-163
-NIL
-generate-cgp
-NIL
+SLIDER
+207
+263
+379
+296
+num-offspring
+num-offspring
 1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
+100
+50.0
 1
+1
+NIL
+HORIZONTAL
 
-INPUTBOX
-18
-198
-141
-258
-num-generation
-10000.0
-1
-0
-Number
-
-BUTTON
-151
+SLIDER
 210
-219
-243
+304
+382
+337
+mutation-rate
+mutation-rate
+0
+20
+0.05
+0.01
+1
+NIL
+HORIZONTAL
+
+BUTTON
+109
+326
+172
+359
 NIL
 go
 T
@@ -143,18 +385,64 @@ NIL
 NIL
 1
 
-INPUTBOX
-18
-119
-120
-179
-mutation-rate
-0.05
+BUTTON
+108
+279
+174
+312
+NIL
+setup
+NIL
 1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+SLIDER
+24
+60
+198
+93
+initial-num-bad-cheese
+initial-num-bad-cheese
 0
-Number
+100
+50.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+23
+104
+195
+137
+initial-num-cheese
+initial-num-cheese
+0
+100
+50.0
+1
+1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
+## ORDER 
+
+First do create-initial-cgps to make the first generation
+Evaluate CGPs against points to that they get MSEs 
+
+
+go method runs 
+	- make offspring
+	- evaluates-cgps-against-points
+
 ## WHAT IS IT?
 
 (a general understanding of what the model is trying to show or explain)
