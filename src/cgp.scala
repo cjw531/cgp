@@ -7,474 +7,302 @@ import org.nlogo.core.AgentKind
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.math.BigDecimal.double2bigDecimal
+import scala.math.abs
 import scala.util.Random
 
 class cgp extends api.DefaultClassManager {
-  /* Node Class */
-  class Node(idx: Int, num: Int, col_index: Int) {
-    var func_idx = idx
-    def number = num
-    var incoming = ListBuffer[Node]()
-    var outgoing = ListBuffer[Node]()
-    val col_where = col_index
-    def add_in(new_node: Node): Unit = {
-      this.incoming += new_node
-    }
-    def remove_in(removal: Node): Unit = {
-      this.incoming -= removal
-    }
-    def add_out(new_node: Node): Unit = {
-      this.outgoing += new_node
-    }
-  }
 
-  /* Cgp Class */
-  class Cgp(input: Int, output: Int, level: Int, row: Int, col: Int, funcs: List[List[Double] => Double]) {
-    val num_input = input
-    val num_output = output
-    val arity = 2
-    val lv_back = level
-    val num_row = row
-    val num_col = col
+  /*
+  Defines possible functions for operators to contain
+   */
+    class Functions() {
+      val total_funcs = 7
 
-    val functions_options = funcs
-    var node_list = ListBuffer[Node]()
-    var NU = ListBuffer[Boolean]()
-    var evaluation_score: Double = 0
-
-    def set_evaluation_score(scoreToSet: Double): Unit = {
-      this.evaluation_score = scoreToSet
-    }
-
-    def add_to_node_list(node: Node): Unit = {
-      this.node_list += node
-    }
-
-    def set_node_list(node_list: ListBuffer[Node]): Unit = {
-      this.node_list = node_list
-    }
-
-    def set_NU(nu_arr: ListBuffer[Boolean]): Unit = {
-      this.NU = nu_arr
-    }
-
-    def create_cgp(): Unit = {
-      // add input nodes to the node list
-      for (i <- 0 to (this.num_input - 1)) {
-        var input_node = new Node(-1, i, 0)
-        this.node_list += input_node
+      def add (x: Double, y: Double): Double = {
+        x + y
       }
-
-      // for node grid (inner nodes, without input nodes)
-      var curr_num_nodes_in_row = -1
-      var col_start = 1 // n-th col #
-      for (i <- this.num_input to ((this.num_input - 1) + (this.num_row * this.num_col))) {
-        curr_num_nodes_in_row += 1
-        if (curr_num_nodes_in_row == this.num_row) {
-          col_start += 1
-          curr_num_nodes_in_row = 0
+      def subtract (x: Double, y: Double): Double = {
+        x - y
+      }
+      def multiply (x: Double, y: Double): Double = {
+        x * y
+      }
+      def divide (x: Double, y: Double): Double = {
+        if (y == 0) {
+          return 0
         }
-        //        if ((i - this.num_input) % this.num_col == 0) {
-        //          col_start += 1
-        //        }
-        var inner_node = new Node(random_function(), i, col_start)
-        this.node_list += inner_node // add node to the list
+        return (x / y)
       }
-
-      // randomly connect nodes
-      for (i <- this.num_input to (this.num_input - 1) + (this.num_row * this.num_col)) {
-        var node = this.node_list(i)
-        var col_from = node.col_where - this.lv_back
-        if (col_from < 0) col_from = 0
-        var col_to = node.col_where - 1
-        var subset = get_node_subset(col_from, col_to, this.arity)
-        for (n <- subset) {
-          node.add_in(n)
-          this.node_list(n.number).add_out(node)
-        }
+      def constant(x: Double, y:Double): Double = {
+        return 1.0
       }
-
-      // connect edge to outputs
-      for (i <- this.num_input + (this.num_row * this.num_col) to this.num_input + (this.num_row * this.num_col) + this.num_output - 1) {
-        var output_node = new Node(-1, i, this.num_col + 1)
-        this.node_list += output_node
-        var col_from = 0 // can reach back to any level
-        var subset = get_node_subset(col_from, this.num_col, 1) // output node has only 1 edge
-        output_node.add_in(subset(0)) // 0th element is the only element stored here
-        this.node_list(subset(0).number).add_out(output_node)
-      }
-
-
-      println("Creating CGP")
-      for (le_node <- this.node_list) {
-        print("Node ")
-        print(le_node.number)
-        print(" is in column ")
-        println(le_node.col_where)
-      }
-
-
-
-    }
-
-    /* based on levels_back and arity, get the adjacent nodes */
-    def get_node_subset(from: Int, to: Int, arity: Int): ListBuffer[Node] = {
-      var subset = ListBuffer[Node]()
-      for (node <- this.node_list) {
-        if (node.col_where >= from && node.col_where <= to) {
-          subset += node
-        }
-        // TODO: think of an optimization here
-        // TODO: e.g. early exit from the loop?
-      }
-      var adjacent = ListBuffer[Node]()
-      for (i <- 1 to arity) { // pick arity # of random nodes
-        adjacent += subset.apply(Random.nextInt(subset.size))
-      }
-      return adjacent // return the node that has a connection
-    }
-
-    /* returns random operations for each node */
-    def random_function(): Int = {
-      val r = scala.util.Random
-      r.nextInt(this.functions_options.size)
-    }
-
-    //    // Step 1
-    //    var ToEvaluate = ListBuffer[Boolean]() // length = MaxGraph.Length
-    //    for (i <- 0 to (this.num_row * this.num_col)) {
-    //      ToEvaluate += false
-    //    }
-    //    var NodeOutput = ListBuffer[Double]() // length = MaxGraph.Length + Number of program inputs
-    //    for (i <- 0 to this.num_input + (this.num_row * this.num_col)) {
-    //      NodeOutput += 0.0
-    //    }
-    //    var NodesUsed = ListBuffer[Int]() // length = M ?
-    //
-    //    // Step 2
-    //    //// Identify initial nodes that need to be evaluated
-    //    for (i <- this.num_input + (this.num_row * this.num_col) to this.num_input + (this.num_row * this.num_col) + this.num_output - 1) {
-    //      ToEvaluate(this.node_list(i).incoming(0).number - this.num_input) = true
-    //    }
-    //
-    //    var p = ToEvaluate.length - 1
-    //    do {
-    //      if (ToEvaluate(p)) {
-    //        // set incoming edges to be true
-    //        var x = this.node_list(this.num_input + p).incoming(0)
-    //        var y = this.node_list(this.num_input + p).incoming(1)
-    //        if (!x.incoming.isEmpty) {
-    //          ToEvaluate(x.number - this.num_input) = true
-    //        }
-    //        if (!y.incoming.isEmpty) {
-    //          ToEvaluate(y.number - this.num_input) = true
-    //        }
-    //        NodesUsed += p
-    //      }
-    //      p = p - 1
-    //    } while (p >= 0)
-
-    // Step 3
-    //    //// load input data values
-    //    var inputs_list = List(5.0, 2.0)
-    //    p = 0
-    //    do {
-    //      NodeOutput += inputs_list(p)
-    //    } while (p < this.num_input)
-
-    // Step 4
-    //// Execute graph
-
-
-
-    /////////////////////////
-    def solve_cgp(inputs_list: List[Double]): ListBuffer[Double] = {
-      //      println("Solving CGP")
-      //      for (le_node <- this.n ode_list) {
-      //        print("Node ")
-      //        print(le_node.number)
-      //        print(" is in column ")
-      //        println(le_node.col_where)
-      //      }
-      var predictions = ListBuffer[Double]()
-
-      // if no active nodes, then output maps to input and just return the point then
-      // output becomes their input b/c their active node array is all false
-      if (!this.NU.contains(true)) {
-        for (output_node <- (this.num_input + (this.num_row * this.num_col)) to (this.num_input + (this.num_row * this.num_col) + this.num_output - 1)) {
-          for (incoming_node <- this.node_list(output_node).incoming) {
-            predictions += inputs_list(incoming_node.number)
-          }
-        }
-        return predictions
-      }
-
-      var NP = ListBuffer[Double]() // values arr
-      // Set all to 0 to begin with
-      for (i <- 0 to this.NU.length - 1) {
-        NP += 0
-      }
-
-      //      println("Set all NP to 0 to begin with")
-
-      //      for (le_node <- this.node_list) {
-      //        print("Node ")
-      //        print(le_node.number)
-      //        print(" is in column ")
-      //        println(le_node.col_where)
-      //      }
-
-      for (cgp_node_idx <- 0 to this.NU.length - 1) {
-        if (NU(cgp_node_idx) == true) {
-          var node = this.node_list(cgp_node_idx + this.num_input) // offset so we can idx node in node_list
-          var temp_vals = ListBuffer[Double]()
-          for (incoming_node <- node.incoming) {
-            if (incoming_node.incoming.isEmpty) { // use input value
-              temp_vals += inputs_list(incoming_node.number)
-            }
-            else { // get the list of incoming values
-              temp_vals += NP(incoming_node.number - this.num_input)
-            }
-          }
-          NP(cgp_node_idx) = this.functions_options(node.func_idx)(temp_vals.toList) // applies function
-        }
-      }
-
-      //      println("Went from front to back of active nodes to compute vals")
-
-      //      for (le_node <- this.node_list) {
-      //        print("Node ")
-      //        print(le_node.number)
-      //        print(" is in column ")
-      //        println(le_node.col_where)
-      //      }
-
-      // go thru all the outputs (each output has 1 incoming)
-      for (output_node <- (this.num_input + (this.num_row * this.num_col)) to (this.num_input + (this.num_row * this.num_col) + this.num_output - 1)) {
-        var incoming_node = this.node_list(output_node).incoming(0)
-        if (incoming_node.incoming.isEmpty) { // is this an input node?
-          predictions += inputs_list(incoming_node.number)
+      def both_positive(x: Double, y: Double): Double = {
+        if (x > 0 && y > 0) {
+          return 1.0
         }
         else {
-          predictions += NP(incoming_node.number - this.num_input)
+          return 0.0
         }
       }
-      import scala.math.abs
 
-      //      for (le_node <- this.node_list) {
-      //        print("Node ")
-      //        print(le_node.number)
-      //        print(" is in column ")
-      //        println(le_node.col_where)
-      //      }
-
-      //      print("Node List: ")
-      //      println(this.node_list)
-      //      for (node <- this.node_list) {
-      //        print("Node number: ")
-      //        print(node.number)
-      //        print ( " with function idx of ")
-      //        print(" with column number ")
-      //        print(node.col_where)
-      //        print(node.func_idx)
-      //        print(" has incoming edges ")
-      //        for (incoming_node <- node.incoming) {
-      //          print(incoming_node.number)
-      //          print(" ")
-      //        }
-      //        println("")
-      //      }
-      //      println("")
-      //
-      //      print("Inputs: ")
-      //      println(inputs_list)
-      //      print("Predictions: ")
-      //      println(predictions)
-
-      // convert predictions so that they are probabilities that sum to 1
-      predictions = predictions.map(x => scala.math.abs(x))
-      var total = predictions.sum
-
-      if (total > 0) {
-        predictions = predictions.map(x => x / total)
+      def greater_than(x: Double, y:Double): Double = {
+        if (x >= y) {
+          return 1.0
+        }
+        else {
+          return 0.0
+        }
       }
-      else {
-        predictions = predictions.map(x => 0.0 / 1.0)
-      }
-      /// Print statements to ensure working correctly
+    }
 
-      return predictions
+  /*
+  Defines node class which define network
+   */
+    class Node(number_i: Int, func_idx_i: Int, incoming1: Int, incoming2: Int) {
+      val number = number_i
+      var func_idx = func_idx_i
+      var Incoming1 = incoming1
+      var Incoming2 = incoming2
+
+      def set_incoming_node_1(new_incoming_node_1: Int): Unit = {
+        this.Incoming1 = new_incoming_node_1
+      }
+
+      def set_incoming_node_2(new_incoming_node_2: Int): Unit = {
+        this.Incoming2 = new_incoming_node_2
+      }
+
+      def set_func_idx(new_func_idx: Int): Unit = {
+        this.func_idx = new_func_idx
+      }
 
     }
 
+  /*
+  Defines CGP object that holds entire network
+   */
+  class Cgp(num_inputs_i: Int, num_outputs_i: Int, lvls_back_i: Int, num_rows_i: Int, num_cols_i: Int) {
+    val arity = 2
+    val num_inputs = num_inputs_i
+    val num_outputs = num_outputs_i
+    val lvls_back = lvls_back_i
+    val num_rows = num_rows_i
+    val num_cols = num_cols_i
+    val graph = ListBuffer[Node]()
+    val funcs = new Functions()
+    var node_list = ListBuffer[Node]()
+    var OutputConnections = ListBuffer[Int]()
+    val r = scala.util.Random
+    var ActiveNodes = ListBuffer[Boolean]()
+    def set_node_list(new_node_list: ListBuffer[Node]): Unit = {
+      this.node_list = new_node_list
+    }
+    def set_output_connection(new_output_connection: Int, idx_to_change: Int): Unit = {
+      this.OutputConnections(idx_to_change) = new_output_connection
+    }
+    def add_to_output_connections(node_num_to_add: Int): Unit = {
+      OutputConnections += node_num_to_add
+    }
+
+    /*
+    Creates random CGP
+     */
+    def create_cgp(): Unit = {
+      // make graph
+      /////// create nodes with linkage back to any of the nodes
+      var last_node_number_in_column = this.num_inputs - 1
+      // Creates new inner node and choose a random incoming edge on it which can be any node in a column before it
+      var row_counter = 1
+      for (i <- this.num_inputs to (this.num_inputs + (this.num_rows * this.num_cols) - 1)) {
+        var incoming1 = 0
+        var incoming2 = 0
+        if (last_node_number_in_column > 0) {
+          incoming1 = r.nextInt(last_node_number_in_column) // pick random node before it
+          incoming2 = r.nextInt(last_node_number_in_column)
+        }
+        var new_node = new Node(i, r.nextInt(funcs.total_funcs), incoming1, incoming2) // create new node
+        this.node_list += new_node // add to node list
+        // Set last node in column
+        if (row_counter % this.num_rows == 0) {
+          last_node_number_in_column = i
+          row_counter = 0
+        }
+        row_counter += 1
+      }
+      // connect outputs to any previous nodes
+      for (i <- (this.num_inputs + (this.num_rows * this.num_cols)) to (this.num_inputs + (this.num_rows * this.num_cols) + this.num_outputs - 1)) {
+        this.OutputConnections += r.nextInt(this.num_inputs + (this.num_rows*this.num_cols) - 1)
+      }
+    }
+
+    /*
+    Generate a boolean array of all the nodes that are active in the network
+     */
     def find_active_nodes(): Unit = {
-      // Initialize Boolean list with all falses
-      this.NU.clear()
-      for (i <- this.num_input to (this.num_input + (this.num_row * this.num_col) - 1)) {
-        this.NU += false
+
+      // Instantiate active nodes array with all false to start with
+      for (i <- 0 to (this.num_rows*this.num_cols)-1) {
+        this.ActiveNodes += false
+      }
+      // Set first linkages from output nodes to graph to be true
+      for (output_node <- this.OutputConnections) {
+        if (output_node >= this.num_inputs) {
+          this.ActiveNodes(output_node - this.num_inputs) = true
+        }
       }
 
-      // Find active nodes (go from output node and track the path to input)
-      for (i <- (this.num_input + (this.num_row * this.num_col)) to (this.num_input + (this.num_row * this.num_col) + this.num_output) - 1) {
-        var output_node = this.node_list(i)
-        new_find_path(output_node)
+      // Follow path to set all active nodes to be true
+      for (output_node <- this.OutputConnections) {
+        if (output_node >= this.num_inputs) {
+          find_active_nodes_helper(output_node)
+        }
       }
-    }
+    } // end of Find Active Nodes
 
-    def new_find_path(node: Node): Unit = {
-      if (node.incoming.isEmpty) {
+    def find_active_nodes_helper(node_number: Int): Unit = {
+      // Base case: If an input node, then has ended path
+      if (node_number < this.num_inputs) {
         return
       }
-      for (n <- node.incoming) {
-        if (n.incoming.isEmpty == false) {
-          this.NU(n.number - this.num_input) = true
-          new_find_path(n)
+
+      // Recurse on incoming edges and set to true
+      if (this.node_list(node_number - this.num_inputs).Incoming1 >= this.num_inputs) {
+        this.ActiveNodes(this.node_list(node_number - this.num_inputs).Incoming1 - this.num_inputs) = true
+      }
+      if (this.node_list(node_number - this.num_inputs).Incoming2 >= this.num_inputs) {
+        this.ActiveNodes(this.node_list(node_number - this.num_inputs).Incoming2 - this.num_inputs) = true
+      }
+      find_active_nodes_helper(this.node_list(node_number - this.num_inputs).Incoming1)
+      find_active_nodes_helper(this.node_list(node_number - this.num_inputs).Incoming2)
+    } // end of recursive helper function
+
+    /*
+    Solve the network to get output values
+     */
+    def decode_cgp(input_values: List[Double]): List[Double] = {
+      // if all active nodes are false, then just return the input value
+      if (!this.ActiveNodes.contains(true)) {
+        var result = ListBuffer[Double]()
+        for (output_node <- this.OutputConnections) {
+          result += input_values(output_node)
+        }
+        return result.toList
+      }
+
+      var NodeOutput = ListBuffer[Double]()
+
+      // Set all 0's to start with
+      for (i <- 0 to (this.num_inputs + (this.num_rows*this.num_cols) - 1)) {
+        NodeOutput += 0.0
+      }
+
+      // Set input values to begin with
+      for (input_idx <- 0 to input_values.length-1) {
+        NodeOutput(input_idx) = input_values(input_idx)
+      }
+      for (active_node_idx <- 0 to ActiveNodes.length-1) {
+        if (ActiveNodes(active_node_idx) == true) {
+          // If active node is true, then compute the function at the node with its incoming edges
+          var function_to_apply = this.node_list(active_node_idx).func_idx
+          var computed_val = 0.0
+          // apply functions to incoming edges at nodes
+          if (function_to_apply == 0) {
+            computed_val = funcs.add(NodeOutput(this.node_list(active_node_idx).Incoming1), NodeOutput(this.node_list(active_node_idx).Incoming2))
+          }
+          else if (function_to_apply == 1) {
+            computed_val = funcs.subtract(NodeOutput(this.node_list(active_node_idx).Incoming1), NodeOutput(this.node_list(active_node_idx).Incoming2))
+          }
+          else if (function_to_apply == 2) {
+            computed_val = funcs.multiply(NodeOutput(this.node_list(active_node_idx).Incoming1), NodeOutput(this.node_list(active_node_idx).Incoming2))
+          }
+          else if (function_to_apply == 3) {
+            computed_val = funcs.divide(NodeOutput(this.node_list(active_node_idx).Incoming1), NodeOutput(this.node_list(active_node_idx).Incoming2))
+          }
+          else if (function_to_apply == 4) {
+            computed_val = funcs.constant(NodeOutput(this.node_list(active_node_idx).Incoming1), NodeOutput(this.node_list(active_node_idx).Incoming2))
+          }
+          else if (function_to_apply == 5) {
+            computed_val = funcs.both_positive(NodeOutput(this.node_list(active_node_idx).Incoming1), NodeOutput(this.node_list(active_node_idx).Incoming2))
+          }
+          else {
+            computed_val = funcs.greater_than(NodeOutput(this.node_list(active_node_idx).Incoming1), NodeOutput(this.node_list(active_node_idx).Incoming2))
+          }
+          // set value in array to use in later iteration
+          NodeOutput(active_node_idx + this.num_inputs) = computed_val
         }
       }
-    }
-
-    def mutate_cgp(probability: Double, is_node: Boolean, is_edge: Boolean): Unit = {
-      val r = new scala.util.Random
-      for (node_idx <- this.num_input to node_list.size - 1) {
-        var rand_prob = r.nextDouble
-        if (rand_prob <= probability) {
-          if (is_node && is_edge) mutate_node(this.node_list(node_idx))
-          else if (is_node) mutate_node(this.node_list(node_idx))
-          else if (is_edge) mutate_incoming_edges(this.node_list(node_idx))
-        }
+      // Get output values by extracting output from its incoming edge
+      var result = ListBuffer[Double]()
+      for (output_node <- this.OutputConnections) {
+        result += NodeOutput(output_node)
       }
+      return result.toList
+    }
+  } // end of CGP class
+
+  /*
+  Mutate CGP by re-making nodes by a probability
+   */
+  def mutate_cgp(parent_cgp: Cgp, mutation_rate: Double): Cgp = {
+    // deep copy CGP
+    var mutated_cgp = new Cgp(parent_cgp.num_inputs, parent_cgp.num_outputs, parent_cgp.lvls_back, parent_cgp.num_rows, parent_cgp.num_cols)
+    var node_list_copied = ListBuffer[Node]()
+    for (node <- parent_cgp.node_list) {
+      var copied_node = new Node(node.number, node.func_idx, node.Incoming1, node.Incoming2)
+      node_list_copied += copied_node
+    }
+    mutated_cgp.set_node_list(node_list_copied)
+    for (output_node <- parent_cgp.OutputConnections) {
+      mutated_cgp.add_to_output_connections(output_node)
     }
 
-    def mutate_incoming_edges(node: Node): Unit = {
-      if (node.incoming.size == 1) {
-        // Output node
-        node.incoming.clear()
-        var col_from = this.num_col - this.lv_back + 1
-        if (col_from < 0) col_from = 0
-        var col_to = this.num_col
-        var subset = get_node_subset(0, this.num_col, 1)
-        for (subst_node <- subset) {
-          node.add_in(subst_node)
-        }
-      }
-      else {
-        // Inner node
-        node.incoming.clear()
-        var col_from = node.col_where - this.lv_back
-        if (col_from < 0) col_from = 0
-        var col_to = node.col_where - 1
-        var subset = get_node_subset(col_from, col_to, this.arity)
-        for (subst_node <- subset) {
-          node.add_in(subst_node)
-        }
-      }
-    }
+    val r = scala.util.Random
 
-    def mutate_operator(node: Node): Unit = {
-      var prev_func_idx = node.func_idx
-      var new_func_idx = random_function()
-      while (prev_func_idx == new_func_idx) new_func_idx = random_function()
-      node.func_idx = new_func_idx
-    }
-
-    def mutate_node(node: Node): Unit = {
-      mutate_operator(node)
-      mutate_incoming_edges(node)
-    }
-
-  }
-
-  /* Functions Class */
-  class Functions {
-    val add = (vals: List[Double]) => {
-      vals.sum
-    }
-
-    val divide: List[Double] => Double = vals => {
-      var result = vals(0)
-      for (i <- 1 to vals.size - 1) {
-        if (vals(i) == 0) {
-          result = 0
+    // remake nodes by certain probability
+    var flag_changed = false
+    while (flag_changed == false) {
+      var last_node_number_in_column = mutated_cgp.num_inputs - 1
+      var row_counter = 1
+      for (node_idx <- 0 to (mutated_cgp.node_list.length - 1) + mutated_cgp.num_outputs) {
+        //        println(node_idx)
+        if (node_idx > mutated_cgp.node_list.length - 1) {
+          var output_idx = node_idx - mutated_cgp.node_list.length
+          val prob = r.nextDouble * 100
+          if (prob <= mutation_rate) {
+            flag_changed = true
+            mutated_cgp.set_output_connection(r.nextInt(mutated_cgp.num_inputs + (mutated_cgp.num_rows*mutated_cgp.num_cols) - 1), output_idx)
+          }
         }
         else {
-          result = result / vals(i)
+          var node = mutated_cgp.node_list(node_idx)
+          val prob = r.nextDouble * 100
+          if (prob <= mutation_rate) {
+            flag_changed = true // mark that a change was made
+            // alter an entire node (alter incoming edges and function)
+            node.set_func_idx(r.nextInt(3))
+            if (last_node_number_in_column > 0) {
+              node.set_incoming_node_1(r.nextInt(last_node_number_in_column))
+              node.set_incoming_node_2(r.nextInt(last_node_number_in_column))
+            }
+          }
         }
+        if (row_counter % mutated_cgp.num_rows == 0) {
+          last_node_number_in_column = node_idx + 1
+          row_counter = 0
+        }
+        row_counter += 1
       }
-      result
     }
 
-    val subtract: List[Double] => Double = vals => {
-      var result = vals(0)
-      for (i <- 1 to vals.size - 1) {
-        result = result - vals(i)
-      }
-      result
-    }
-
-    val multiply = (vals: List[Double]) => {
-      vals.product
-    }
-
-    val constant: List[Double] => Double = vals => {
-      val result = 1
-      result
-    }
-
-    val compare_1: List[Double] => Double = vals => {
-      var r = scala.util.Random
-      var a = vals(r.nextInt(vals.size))
-      var b = vals(r.nextInt(vals.size))
-      var result = 1
-      if (a < b) result = 1
-      else result = 0
-      result
-    }
-
-    val compare_2: List[Double] => Double = vals => {
-      var all_positive = true
-      for (v <- vals) {
-        if (v <= 0) all_positive = false
-      }
-
-      var result = 1
-      if (all_positive) result = 1
-      else result = 0
-      result
-    }
-
-    val compare_3: List[Double] => Double = vals => {
-      var any_positive = false
-      for (v <- vals) {
-        if (v > 0) any_positive = true
-      }
-
-      var result = 1
-      if (any_positive) result = 1
-      else result = 0
-      result
-    }
-
+    // compute active nodes
+    mutated_cgp.find_active_nodes()
+    return mutated_cgp
   }
 
-  var num_input = 1
-  var num_output = 1
-  var arity = 2
-  var lv_back = 2
-  var num_row = 3
-  var num_col = 3
-
-  var num_cgps_to_evaluate = 10
-  var cgps = ListBuffer[Cgp]()
-  var best_cgp_idx = -1
-  var lowest_cgp_metric_val: Double = 0
-
-  var funcs = new Functions()
-  var function_options = List(funcs.add, funcs.subtract, funcs.multiply, funcs.divide,
-    funcs.constant, funcs.compare_1, funcs.compare_2, funcs.compare_3)
-
-  // initialize because scala doesn't allow variable declaration without initialization
-  var CGP_to_mutate = new Cgp(-1, num_output, lv_back, num_row, num_col, function_options)
-
+  /*******************************************************************************
+  **************************NETLOGO PORTION***************************************
+   *******************************************************************************/
+    // define initial map to contain turtle -> Cgp relationship
   var turtlesToCgps: mutable.Map[api.Turtle, Cgp] = mutable.LinkedHashMap[api.Turtle, Cgp]()
 
   /* Load primitives for NetLogo */
@@ -485,74 +313,66 @@ class cgp extends api.DefaultClassManager {
     manager.addPrimitive(name = "clear-cgp", clearCgp)
   }
 
-
-  object mutate_reproduce extends api.Command {
-    override def getSyntax: Syntax =
-      Syntax.commandSyntax(right = List(Syntax.AgentType, Syntax.NumberType, Syntax.NumberType, Syntax.NumberType, Syntax.NumberType, Syntax.NumberType, Syntax.NumberType), agentClassString = "-T--")
-
-    override def perform(args: Array[Argument], context: Context): Unit = {
-      CGP_to_mutate = turtlesToCgps(args(0).getAgent.asInstanceOf[api.Turtle]) // get cgp from parameter
-      var mutation_rate = args(1).getDoubleValue
-      var numb_inps = args(2).getIntValue
-      var numb_outs = args(3).getIntValue
-      var numb_lvls = args(4).getIntValue
-      var numb_rows = args(5).getIntValue
-      var numb_cols = args(6).getIntValue
-      // Make new CGP with same properties as parent
-      var mutated_cgp = new Cgp(numb_inps, numb_outs, numb_lvls, numb_rows, numb_cols, function_options)
-      // Set nodes in node list
-      for (node <- CGP_to_mutate.node_list) {
-        var copied_node = new Node(node.func_idx, node.number, node.col_where)
-        mutated_cgp.add_to_node_list(copied_node)
-      }
-      // Set incoming and outgoing of nodes
-      for (node <- CGP_to_mutate.node_list) {
-        for (incoming_node <- node.incoming) {
-          mutated_cgp.node_list(node.number).add_in(mutated_cgp.node_list(incoming_node.number))
-        }
-        for (outgoing_node <- node.outgoing) {
-          mutated_cgp.node_list(node.number).add_out(mutated_cgp.node_list(outgoing_node.number))
-        }
-      }
-      // Mutate
-      mutated_cgp.mutate_cgp(mutation_rate, true, true)
-      mutated_cgp.find_active_nodes()
-
-      context.getAgent match {
-        case turtle: api.Turtle => turtlesToCgps.update(turtle, mutated_cgp)
-      }
-    }
-  }
-
-  object getAction extends api.Reporter {
-    override def getSyntax =
-      Syntax.reporterSyntax(right = List(Syntax.ListType), ret = Syntax.ListType, agentClassString = "-T--")
-
-    def report(args: Array[Argument], context: Context): AnyRef = {
-      var input_points_nlogo = args(0).getList.map(x => x.toString.toDouble).toList
-      var action_probs = turtlesToCgps(context.getAgent.asInstanceOf[api.Turtle]).solve_cgp(input_points_nlogo)
-      action_probs.toLogoList // stay, left, right
-    }
-  }
-
+  /*
+  Adds CGP to agent
+   */
   object addCgp extends api.Command {
     override def getSyntax: Syntax = Syntax.commandSyntax(right = List(Syntax.NumberType, Syntax.NumberType, Syntax.NumberType, Syntax.NumberType, Syntax.NumberType), agentClassString = "-T--")
 
     override def perform(args: Array[Argument], context: Context): Unit = {
+      // get inputs
       var numb_inps = args(0).getIntValue
       var numb_outs = args(1).getIntValue
       var numb_lvls = args(2).getIntValue
       var numb_rows = args(3).getIntValue
       var numb_cols = args(4).getIntValue
-      var net = new Cgp(numb_inps, numb_outs, numb_lvls, numb_rows, numb_cols, function_options)
-      net.create_cgp()
-      net.find_active_nodes()
+      // create cgp instance
+      var net = new Cgp(numb_inps, numb_outs, numb_lvls, numb_rows, numb_cols)
+      net.create_cgp() // creates random network
+      net.find_active_nodes() // finds a boolean array of all the active nodes
       context.getAgent match {
         case turtle: api.Turtle => turtlesToCgps.update(turtle, net)
       }
     }
   }
 
+  /*
+  Mutates the CGP from the parent when creating an offspring
+   */
+  object mutate_reproduce extends api.Command {
+    override def getSyntax: Syntax =
+          Syntax.commandSyntax(right = List(Syntax.AgentType, Syntax.NumberType), agentClassString = "-T--")
+    override def perform(args: Array[Argument], context: Context): Unit = {
+      // get inputs
+      var CGP_to_mutate = turtlesToCgps(args(0).getAgent.asInstanceOf[api.Turtle])
+      var mutation_rate = args(1).getDoubleValue
+      // mutate the parent CGP
+      var offspring_cgp = mutate_cgp(CGP_to_mutate, mutation_rate)
+      context.getAgent match {
+        case turtle: api.Turtle => turtlesToCgps.update(turtle, offspring_cgp)
+      }
+    }
+  }
+
+  /*
+  Decodes the network to get the action vector
+   */
+  object getAction extends api.Reporter {
+    override def getSyntax =
+      Syntax.reporterSyntax(right = List(Syntax.ListType), ret = Syntax.ListType, agentClassString = "-T--")
+
+    def report(args: Array[Argument], context: Context): AnyRef = {
+      // get inputs
+      var input_points_nlogo = args(0).getList.toList.map(_.toString.toDouble)
+      // solve the network based on the active nodes
+      var action_probs = turtlesToCgps(context.getAgent.asInstanceOf[api.Turtle]).decode_cgp(input_points_nlogo)
+      return action_probs.toLogoList
+    }
+  }
+
+  /*
+  Removes CGP from hashmap to clear memory
+   */
   object clearCgp extends api.Command {
     override def getSyntax =
       Syntax.commandSyntax(right = List(), agentClassString = "-T--")
