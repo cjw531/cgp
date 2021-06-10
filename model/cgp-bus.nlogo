@@ -239,10 +239,10 @@ to check-death
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-509
-10
-1041
-543
+519
+12
+1051
+545
 -1
 -1
 15.9
@@ -266,10 +266,10 @@ ticks
 30.0
 
 BUTTON
-124
-277
-192
+242
+236
 310
+269
 NIL
 go
 T
@@ -283,10 +283,10 @@ NIL
 1
 
 INPUTBOX
-217
-19
-306
-79
+189
+104
+278
+164
 mutation-rate
 0.05
 1
@@ -294,10 +294,10 @@ mutation-rate
 Number
 
 BUTTON
-50
-277
-116
-310
+168
+236
+234
+269
 NIL
 setup
 NIL
@@ -311,10 +311,10 @@ NIL
 1
 
 MONITOR
-299
-117
-372
-162
+93
+176
+167
+221
 Num Mice
 count mice
 17
@@ -322,10 +322,10 @@ count mice
 11
 
 PLOT
-42
-334
-481
-600
+59
+304
+470
+545
 Population
 NIL
 NIL
@@ -340,21 +340,21 @@ PENS
 "Mice" 1.0 0 -16777216 true "" "plot count mice"
 
 MONITOR
-375
-116
-454
-161
-max energy
+193
+176
+278
+221
+Max Energy
 max [energy] of mice
-17
+4
 1
 11
 
 SLIDER
-33
-20
-205
-53
+4
+18
+146
+51
 initial-num-mice
 initial-num-mice
 1
@@ -366,10 +366,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-33
-63
-205
-96
+153
+18
+305
+51
 initial-num-cheese
 initial-num-cheese
 1
@@ -381,10 +381,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-32
-104
-233
-137
+314
+18
+484
+51
 initial-num-bad-cheese
 initial-num-bad-cheese
 0
@@ -396,10 +396,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-33
-187
-222
-220
+30
+59
+219
+92
 energy-gain-from-cheese
 energy-gain-from-cheese
 0
@@ -411,10 +411,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-31
-145
-238
-178
+239
+60
+446
+93
 energy-loss-from-bad-cheese
 energy-loss-from-bad-cheese
 0
@@ -424,6 +424,17 @@ energy-loss-from-bad-cheese
 1
 NIL
 HORIZONTAL
+
+MONITOR
+299
+177
+391
+222
+Mean Energy
+mean [energy] of mice
+4
+1
+11
 
 @#$#@#$#@
 ## WHAT IS IT?
