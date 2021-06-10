@@ -3,46 +3,39 @@ extensions [cgp]
 globals [generation]
 
 turtles-own [energy poisoned]
-inmates-own [age]
-officers-own [age]
+cheese-own [age]
+bad-cheese-own [age]
 
-breed [busses bus]
-breed [inmates inmate]
-breed [officers officer]
+breed [mice mouse]
+breed [cheese a-cheese]
+breed [bad-cheese a-bad-cheese]
 
 
 to setup
   clear-all
   reset-ticks
 
-  create-busses initial-num-busses [
+  create-mice initial-num-mice [
     setxy random-xcor random-ycor
     set color gray
     set shape "my-mouse"
     set size 2
     set energy 100
-;    set heading 90
-    cgp:add-cgps
+    cgp:add-cgps 9 3 5 5 5
   ]
 
-  repeat initial-num-inmate [
-    ask one-of patches with [not any? inmates-here] [sprout-inmates 1 [
-      set shape "person"
-      set color orange
-      set size 1.5
-      set age 1
-      ]
-    ]
+  create-cheese initial-num-cheese [
+    set shape "cheese"
+    setxy random-xcor random-ycor
+    set size 2
+    set age 1
   ]
 
-  repeat initial-num-officer [
-    ask one-of patches with [not any? officers-here] [sprout-officers 1 [
-      set shape "person"
-      set color blue
-      set size 1.5
-      set age 1
-      ]
-    ]
+  create-bad-cheese initial-num-bad-cheese [
+    set shape "cheese"
+    setxy random-xcor random-ycor
+    set size 2
+    set age 1
   ]
 
   ask patches [
@@ -50,27 +43,26 @@ to setup
   ]
 end
 
-to print-cgps
-  ask busses[
-    let cgps cgp:get-cgp-list
-    show cgps
-  ]
-end
 
 
 to go
-  ask busses [
+  ask mice [
     let obs get-observations
     let action-vector cgp:get-action obs
-;    show action-vector ;; raw probabilities
-
-
+     ;; format action-vector to be probabilities
+    set action-vector (map abs action-vector)
+    let total (sum action-vector)
+    ;; protected division
+    ifelse total > 0 [
+      set action-vector (map [i -> i / total] action-vector)
+    ]
+    [
+      set action-vector (map [i -> i * 0] action-vector)
+    ]
     ifelse action-vector = (list 0 0 0)
     [
-      let action one-of [1 2 3]
-      if action = 1 [fd 1]
-      if action = 2 [lt 20]
-      if action = 3 [rt 20]
+      fd 0.2
+      set energy energy - 0.2
     ]
     [
       ;; get cumulative sums
@@ -79,67 +71,47 @@ to go
       set cum-sum lput (item 0 action-vector + item 1 action-vector) cum-sum
       set cum-sum lput (item 1 cum-sum + item 2 action-vector) cum-sum
 
+      ;; perform CDF for weighted probability
       let n random-float sum action-vector
 
-
       (ifelse n < (item 0 cum-sum) [
-        ;; do first action
-        ifelse color = red [
-          fd 0.1
-          set energy energy - 5
-        ]
-        [
-          fd 0.2
-          set energy energy - 1
-        ]
+        ;; move forward
+        fd 0.2
+        set energy energy - 0.2
       ]
       n < (item 1 cum-sum) [
-        ;; do second action
-        ifelse color = red [
-           lt 10
-           set energy energy - 2.5
-        ]
-        [
-           lt 20
-           set energy energy - 0.5
-        ]
+        ;; turn left
+        lt 20
+        set energy energy - 0.1
       ]
-      n < (item 2 cum-sum) [
-        ;; do third action
-        ifelse color = red [
-          rt 10
-          set energy energy - 2.5
-        ]
-        [
-          rt 20
-          set energy energy - 0.5
-        ]
+      n <= (item 2 cum-sum) [
+        ;; turn right
+        rt 20
+        set energy energy - 0.1
       ]
       [
         ;; else should never come here
-          print "Should not be here"
       ])
     ]
     handle-poison
     eat
     check-death
     reproduce
-;    set energy energy - 1
   ]
 
-  ask inmates [
+  ask cheese [
     set age age + 1
     people-death
   ]
 
-  ask officers [
+  ask bad-cheese [
     set age age + 1
     people-death
   ]
 
   create-new-people
 
-  if not any? busses [ stop ]
+  if not any? mice [ stop ]
 
   tick
 end
@@ -158,60 +130,32 @@ to handle-poison
 end
 
 to eat
-  let food one-of inmates-here
+  let food one-of cheese-here
   if food != nobody [
     ask food [die]
     ifelse color = red
     [
-      set energy energy + 3
+      set energy energy + (energy-gain-from-cheese / 2)
       set poisoned 1
     ]
-    [set energy energy + 10]
+    [set energy energy + energy-gain-from-cheese]
   ]
-  set food one-of officers-here
+  set food one-of bad-cheese-here
   if food != nobody [
     ask food [die]
     set color red
-    set energy energy - 20
-  ]
-end
-
-to draw-cone [degrees depth]
-  rt degrees / 2.0
-  pd
-  fd depth
-  lt 180 - ((180 - degrees) / 2.0)
-  fd sqrt (2 * depth ^ 2 * (1 - cos degrees))
-  lt 180 - ((180 - degrees) / 2.0)
-  fd depth
-  lt 180 - (degrees / 2.0)
-  pu
-end
-
-to draw-cones [offset depth degrees num]
-  hatch 1 [
-    hide-turtle
-    set color white
-    lt offset
-    repeat num [
-      draw-cone degrees depth
-      rt degrees
-    ]
-    lt offset + degrees
-    die
+    set energy energy - energy-loss-from-bad-cheese
   ]
 end
 
 to-report get-observations
-  ;; draw-cones (3 * 20 / 2 - 20 / 2) 5 20 3
-
   let obs []
-  rt 20
+  rt 30
   repeat 3 [
     set obs sentence obs (get-in-cone 7 20)
     lt 20
   ]
-  rt 40
+  rt 30
   set obs map [i -> i / 7] obs
   report obs
 end
@@ -219,21 +163,21 @@ end
 to-report get-in-cone [dist angle]
   let obs []
   let cone other turtles in-cone 7 20
-  let b min-one-of cone with [is-bus? self] [distance myself]
+  let b min-one-of cone with [is-mouse? self] [distance myself]
   if-else b = nobody [
     set obs lput 0 obs
   ]
   [
     set obs lput (7 - ((distance b) / 2)) obs
   ]
-  let i min-one-of cone with [is-inmate? self] [distance myself]
+  let i min-one-of cone with [is-a-cheese? self] [distance myself]
   if-else i = nobody [
     set obs lput 0 obs
   ]
   [
     set obs lput (7 - ((distance i) / 2)) obs
   ]
-   let o min-one-of cone with [is-officer? self] [distance myself]
+   let o min-one-of cone with [is-a-bad-cheese? self] [distance myself]
   if-else o = nobody [
     set obs lput 0 obs
   ]
@@ -246,18 +190,18 @@ end
 
 ;; Check if person should die
 to people-death
-  if breed = inmates [
+  if breed = cheese [
     if age > 400 [die]
   ]
-  if breed = officers [
+  if breed = bad-cheese [
     if age > 100 [die]
   ]
 end
 
 to create-new-people
   if random 100 < 10 [
-    ask one-of patches with [not any? inmates-here] [sprout-inmates 1 [
-      set shape "person"
+    ask one-of patches with [not any? cheese-here] [sprout-cheese 1 [
+      set shape "cheese"
       set color orange
       set size 1.5
       set age 1
@@ -265,8 +209,8 @@ to create-new-people
     ]
   ]
   if random 100 < 5 [
-    ask one-of patches with [not any? officers-here] [sprout-officers 1 [
-      set shape "person"
+    ask one-of patches with [not any? bad-cheese-here] [sprout-bad-cheese 1 [
+      set shape "bad-cheese"
       set color blue
       set size 1.5
       set age 1
@@ -280,57 +224,15 @@ to move
 end
 
 to reproduce
-  if random-float 100 < busses-reproduce and energy >= 80[  ; throw "dice" to see if you will reproduce
+  if energy > 100 [  ; throw "dice" to see if you will reproduce
     set energy (energy / 2)               ; divide energy between parent and offspring
     hatch 1 [
       rt random-float 360 fd 1
-      cgp:mutate-reproduce myself 0.05
-    ]  ; hatch an offspring and move it forward 1 step
+      cgp:mutate-reproduce myself mutation-rate
+    ]
   ]
 end
 
-;to reproduce
-;  if ticks != 0 [
-;    if ticks mod num-generation = 0 [ ;; in every num-generation tick
-;      set generation generation + 1
-;
-;      let parent one-of (busses with-max [energy])
-;      let wild-card one-of (busses with [energy > (([energy] of parent) - 50)])
-;      ;    ask busses [set parent max-one-of busses [energy] ] ;; highest energy
-;      if parent != nobody [
-;        ask busses with [(who != [who] of parent) and (who != [who] of wild-card)]
-;        [
-;          die
-;        ]
-;        repeat (num-offspring - num-wild-card-offspring) [
-;          create-busses 1 [ ;; make 5 offspring
-;            setxy ([xcor] of parent) ([ycor] of parent)
-;            set color gray
-;            set shape "my-mouse"
-;            set size 2
-;            set energy 100
-;            cgp:mutate-reproduce parent 0.05 ;; mutation and reproduction rate, respectively
-;          ]
-;        ]
-;        ask parent [die]
-;      ]
-;      if wild-card != nobody [
-;        ;; make offspring for wild card
-;        repeat num-wild-card-offspring [
-;          create-busses 1 [ ;; make 5 offspring
-;            setxy ([xcor] of wild-card) ([ycor] of wild-card)
-;            set color gray
-;            set shape "my-mouse"
-;            set size 2
-;            set energy 100
-;            cgp:mutate-reproduce wild-card 0.05 ;; mutation and reproduction rate, respectively
-;          ]
-;        ]
-;        ask wild-card [die]
-;      ]
-;    ]
-;  ]
-;end
 
 to check-death
   if energy < 0 [die]
@@ -453,8 +355,8 @@ SLIDER
 20
 205
 53
-initial-num-busses
-initial-num-busses
+initial-num-mice
+initial-num-mice
 1
 50
 10.0
@@ -464,30 +366,15 @@ NIL
 HORIZONTAL
 
 SLIDER
-34
-146
-206
-179
-num-generation
-num-generation
-100
-1000
-220.0
-20
-1
-NIL
-HORIZONTAL
-
-SLIDER
 33
 63
 205
 96
-initial-num-inmate
-initial-num-inmate
+initial-num-cheese
+initial-num-cheese
 1
 100
-20.0
+24.0
 1
 1
 NIL
@@ -496,13 +383,13 @@ HORIZONTAL
 SLIDER
 32
 104
-204
+233
 137
-initial-num-officer
-initial-num-officer
+initial-num-bad-cheese
+initial-num-bad-cheese
 0
 100
-18.0
+10.0
 1
 1
 NIL
@@ -520,45 +407,30 @@ generation
 15
 
 SLIDER
-17
-225
-228
-258
-num-wild-card-offspring
-num-wild-card-offspring
-1
-40
-2.0
-1
-1
-NIL
-HORIZONTAL
-
-SLIDER
-34
-185
-206
-218
-num-offspring
-num-offspring
-0
-50
-6.0
-1
-1
-NIL
-HORIZONTAL
-
-SLIDER
-261
-252
-433
-285
-busses-reproduce
-busses-reproduce
+33
+187
+222
+220
+energy-gain-from-cheese
+energy-gain-from-cheese
 0
 100
-5.0
+10.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+31
+145
+238
+178
+energy-loss-from-bad-cheese
+energy-loss-from-bad-cheese
+0
+100
+12.0
 1
 1
 NIL
@@ -615,6 +487,13 @@ arrow
 true
 0
 Polygon -7500403 true true 150 0 0 150 105 150 105 293 195 293 195 150 300 150
+
+bad-cheese
+true
+0
+Polygon -14835848 true false 150 60 105 210 210 210 150 60 165 60 225 210 210 210
+Circle -1184463 true false 135 165 30
+Circle -1184463 true false 150 105 30
 
 box
 false
@@ -675,6 +554,13 @@ Circle -16777216 true false 30 180 90
 Polygon -16777216 true false 162 80 132 78 134 135 209 135 194 105 189 96 180 89
 Circle -7500403 true true 47 195 58
 Circle -7500403 true true 195 195 58
+
+cheese
+true
+0
+Polygon -955883 true false 150 60 105 210 210 210 150 60 165 60 225 210 210 210
+Circle -1184463 true false 135 165 30
+Circle -1184463 true false 150 105 30
 
 circle
 false
